@@ -9,6 +9,14 @@ Installieren sie eine möglichst aktuelle Version von Python auf ihrem System. L
 
 ausführen. Der Python-Intepreter zeigt Ihnen die aktuell installierte Version an. Stellen Sie sicher das sie mindestens Python 3.8 installiert haben (Hinweis: Die zur Zeit aktuelle Version ist 3.11)
 
+## Diesen Kurs lokal klonen
+Klonen Sie dieses Repository um die Dateien auf ihrer Festplatte verfügbar zu haben. Öffnen Sie dazu eine Kommandokonsole, wechseln Sie in einen geeigneten Ordner für ihre Programmierprojekte und führen Sie den folgenden Befehl aus
+
+    git clone git@github.com:dmu1981/pythoncourse.git
+
+## Further Read
+Mehr Informationen zu Python, mehr Beispiele und mehr Hilfe finden Sie im offiziellen [Python Tutorial](https://docs.python.org/3/tutorial/introduction.html) oder bei [www.python-lernen.de](https://www.python-lernen.de/)
+
 # Lektion 1 - Grundlagen
 Alle folgenden Programme finden Sie in dem Ordner **lektion1**
 
