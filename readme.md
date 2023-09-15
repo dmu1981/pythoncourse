@@ -539,6 +539,7 @@ Die Funktion "items" liefert alle Key/Value Paare als Tupel
         print(f"{key:20}: {value}")
 
 # Lektion 6 - Module
+Alle folgenden Programme finden Sie in dem Ordner **lektion6**
 
 ## Import 
 Bei größeren Projekten kann es Sinn machen den Code in mehrere, in sich geschlossene Module aufzuteilen. Die Datei *bibliothek.py* enthält eine Funktionsdefinition für die Fakultät aber keine direkten Anweisungen. Würde man diese Datei ausführen würde nichts passieren
@@ -656,6 +657,8 @@ PyPlot erlaubt es einfache interaktive Widgets hinzuzufügen. Für diese können
 Für komplizierte GUIs gibt es dedizierte Libraries (z.B. PyQt5)
 
 # Lektion 7 - Klassen
+Alle folgenden Programme finden Sie in dem Ordner **lektion7**
+
 Klassen sind eine gute Möglichkeit Daten und auf diesen Daten operierende Methoden (Funktionen) zu bündeln.
 Damit lassen sich auch komplexe Datenhierachien elegant abbilden. Klassen werden durch das **class**-Keyword deklariert und haben, ähnlich wie Funktionen, einen Namen.
 
@@ -794,3 +797,99 @@ Die **list** Funktion iteriert dabei vollständig über einen Iterator und fügt
 
 
     [2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987]
+
+# Lektion 8 - PyTorch 
+Alle folgenden Programme finden Sie in dem Ordner **lektion8**
+
+## Installation - pytorch.py
+
+Installieren Sie zunächst [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Windows&target_arch=x86_64&target_version=11&target_type=exe_network) für ihr System
+
+Stellen Sie sicher das CUDA korrekt installiert ist, z.B. indem Se
+
+        nvidia-smi.exe
+
+ausführen. 
+
+Installieren Sie dann [PyTorch 2.0.1 (Stable)](https://pytorch.org/) für ihr System, stellen Sie sicher das Sie CUDA 11.8 als Compute Platform wählen. Starten Sie dann das pytorch.py Skript im Ordner lektion8
+
+        > python lektion8/pytorch.py
+          PyTorch version: 2.0.1.
+          CUDA available
+          
+          
+Stellen Sie sicher das die korrekte Version von PyTorch installiert ist und CUDA verfügbar ist. CUDA sollte mindestens 1 verfügbares GPU device anzeigen (die in ihrem Computer verbaute Grafikkarte)
+
+Mehr Informationen finden Sie [hier](https://medium.com/@leennewlife/how-to-setup-pytorch-with-cuda-in-windows-11-635dfa56724b)
+
+HINWEIS: Sie können Python Kurs auch ohne CUDA ausführen. "Echtes" maschinelles Lernen wird jedoch ohne leistungsstarke Grafikkarte nicht funktionieren. 
+
+## PyTorch Basic - pytorch2.py
+ Tensoren können direkt erzeugt werden
+
+        X = torch.tensor([[1,3],[4,2]])
+        print(X, end="\n\n")
+
+Tensoren können auch indirekt erzeugt werden
+
+        print(torch.zeros(3,3), end="\n\n")
+        print(torch.ones(3,3), end="\n\n")
+        print(torch.rand(3,3), end="\n\n")
+
+# PyTorch Basic - pytorch3.py
+Tensoren haben ein shape und einen Datentyp
+
+        A = torch.rand(5,3)
+        print(A)
+        print(A.shape)
+        print(A.dtype)
+        
+Man kann Tensoren mit gleichem Shape erzeugen über
+
+        B = torch.zeros_like(A)
+        print(B)
+
+# PyTorch Basic - pytorch4.py
+Tensoren befinden sich immer auf einem bestimmten device.
+Dies ist standarmäßig die CPU, die Daten befinden sich also im RAM
+
+        A = torch.rand(5,3)
+        print(A.device)
+
+Tesoren können zwischen verschiedenen Devices verschoben werden
+Dadurch werden die Daten physikalisch kopiert. Das ist aufwendig!
+
+        B = A.to("cuda")
+        print(B.device)
+
+# PyTorch Basic - pytorch5.py
+Rechennoperationen werden auf dem jeweligen Device ausgefphrt und funktionieren nur, wenn alle Tensoren auf dem selben Device sind.
+
+        A = torch.rand(2,2).to("cuda")
+        B = torch.rand(2,2).to("cuda")
+        C = torch.rand(2,2)
+
+        print(A+B)
+        print(A+C)
+
+# PyTorch Basic - pytorch6.py
+Ähnlich wie bei NumPy können viele Operationen auf
+Matrizen direkt ausgedrückt werden
+
+        A = torch.tensor([[2.0,1.0], [3.0,4.0]])
+        B = torch.tensor([[1.0,4.0], [5.0,2.0]])
+        print("A+B")
+        print(A+B, end="\n\n")
+
+        print("A*B")
+        print(A*B, end="\n\n")
+
+        print("A@B")
+        print(A@B, end="\n\n")
+
+Für andere Operationen gibt es spezielle Funktionen
+
+        print("inverse")
+        C = torch.inverse(A)
+        print(C, end="\n\n")
+
