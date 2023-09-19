@@ -41,10 +41,10 @@ class Network(torch.nn.Module):
         return self.seq(x)
 
 if __name__ == "__main__":
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=20, transform=training_transform)
+    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=2000, transform=training_transform)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
-    net = Network()
+    net = Network().to(DEVICE)
     total_parameters = 0
     model_parameters = filter(lambda p: p.requires_grad, net.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])

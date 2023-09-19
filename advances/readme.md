@@ -112,3 +112,5 @@ Einen Mini-Batch durch das Netzwerk vorwärts zu prädizieren ist ebenfalls sehr
     print(x.shape)
 
 Man beachte die Größe des Ergebnisstensors. In der ersten Dimension gibt es 32 Einträge, einen für jedes Sample im Mini-Batch. In der zweiten Dimension gibt es zwei Werte, dies sind die s.g.  [Logits](https://datascience.stackexchange.com/questions/31041/what-does-logits-in-machine-learning-mean) des Modells. Dabei verwenden wir genau eine Dimension pro zu unterscheidender Klasse, in diesem Fall also genau 2 weil wir ja Katzen von Hunden trennen wollen. Je stärker das erste Neuron feuert, desto wahrscheinlicher handelt es sich bei dem Bild um eine Katze und umgekehrt. Im nächsten Abschnitt werden wir sehen wie wir eine erste Trainingsiteration mit PyTorch durchführen können. 
+
+# Der Trainings-Loop ([trainloop.py](trainloop.py))

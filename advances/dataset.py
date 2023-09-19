@@ -36,11 +36,11 @@ class CatsDogsDataSet(Dataset):
             cats = cats[:max_samples_per_class]
             dogs = dogs[:max_samples_per_class]
 
-        for path in tqdm(cats, desc="Loading cats"):
-            self.data.append((read_image(path), 0))
+        for path in cats:
+            self.data.append((path, 0))
         
-        for path in tqdm(dogs, desc="Loading dogs"):
-            self.data.append((read_image(path), 0))
+        for path in dogs:
+            self.data.append((path, 1))
 
         # Note: We don´t need to shuffle here as the
         # data loader will do the shuffling for us
@@ -51,18 +51,20 @@ class CatsDogsDataSet(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        image, label = self.data[idx]
+        path, label = self.data[idx]
+        image = read_image(path).to(DEVICE)
 
         if self.transform:
             image = self.transform(image)
 
-        return image, label    
+        return image, torch.Tensor([label]).type(torch.LongTensor).to(DEVICE).reshape(1,-1)    
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
     
     transform = torch.nn.Sequential(
         transforms.Resize((256, 256)),
+        transforms.ConvertImageDtype(torch.float32)
     )
 
     dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=200, transform=transform)
