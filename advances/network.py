@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from device import DEVICE
-from transform import training_transform
+from transform import training_transform, training_transform_64
 from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
 import numpy as np
 
@@ -10,7 +10,7 @@ class Down(torch.nn.Module):
         super(Down, self).__init__()
         
         self.seq  = torch.nn.Sequential(
-            torch.nn.Conv2d(in_features, out_features, kernel_size=(3,3), padding="same"),
+            torch.nn.Conv2d(in_features, out_features, kernel_size=(5,5), padding="same"),
             torch.nn.MaxPool2d(kernel_size=(2,2), stride=(2,2)),
             torch.nn.BatchNorm2d(num_features = out_features),
             torch.nn.ReLU()
@@ -28,23 +28,23 @@ class Network(torch.nn.Module):
             Down(in_features =   8, out_features =  16), #  16 x  64 x  64
             Down(in_features =  16, out_features =  32), #  32 x  32 x  32 
             Down(in_features =  32, out_features =  64), #  64 x  16 x  16 
-            Down(in_features =  64, out_features = 128), # 128 x   8 x   8
-            Down(in_features = 128, out_features = 256), # 256 x   4 x   4
+            #Down(in_features =  64, out_features = 128), # 128 x   8 x   8
+            #Down(in_features = 128, out_features = 256), # 256 x   4 x   4
             torch.nn.Flatten(), # 4096 dimensional
-            torch.nn.Linear(4096, 512), # 512 dimensional
+            torch.nn.Linear(1024, 256), # 512 dimensional
             torch.nn.ReLU(), # Another ReLU
-            torch.nn.Dropout(0.5),
-            torch.nn.Linear(512, 2) # Go down to two neurons, one for cats, one for dogs
+            #torch.nn.Dropout(0.5),
+            torch.nn.Linear(256, 2) # Go down to two neurons, one for cats, one for dogs
         )
 
     def forward(self, x):
         return self.seq(x)
 
 if __name__ == "__main__":
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=20, transform=training_transform)
+    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=2000, transform=training_transform_64)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
-    net = Network()
+    net = Network().to(DEVICE)
     total_parameters = 0
     model_parameters = filter(lambda p: p.requires_grad, net.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])

@@ -18,6 +18,17 @@ training_transform = transforms.Compose([
         ]
     )
 
+training_transform_64 = transforms.Compose([
+        transforms.Resize((80, 80), antialias=True),
+        transforms.RandomRotation(15),
+        transforms.CenterCrop((72, 72)),
+        transforms.RandomCrop((64, 64)),
+        transforms.RandomHorizontalFlip(0.5),
+        transforms.ColorJitter(0.3, 0.3, 0.3),
+        transforms.ConvertImageDtype(torch.float32)
+        ]
+    )
+
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
     
