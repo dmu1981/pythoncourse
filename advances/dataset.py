@@ -62,10 +62,10 @@ if __name__ == "__main__":
     from matplotlib import pyplot as plt
     
     transform = torch.nn.Sequential(
-        transforms.Resize((256, 256)),
+        transforms.Resize((256, 256), antialias=True),
     )
 
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=200, transform=transform)
+    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=20, transform=transform)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     batch, label = dataloader.__iter__().__next__()
