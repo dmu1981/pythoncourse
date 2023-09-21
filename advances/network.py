@@ -24,17 +24,21 @@ class Network(torch.nn.Module):
         super(Network, self).__init__()
 
         self.seq = torch.nn.Sequential(
-            Down(in_features =   3, out_features =   8), #   8 x 128 x 128
-            Down(in_features =   8, out_features =  16), #  16 x  64 x  64
-            Down(in_features =  16, out_features =  32), #  32 x  32 x  32 
-            Down(in_features =  32, out_features =  64), #  64 x  16 x  16 
+            Down(in_features =   3, out_features =  32), #  32x64x64
+            torch.nn.Dropout2d(0.2), # Compare https://arxiv.org/abs/1411.4280
+            Down(in_features =  32, out_features =  64), #  64x32x32
+            torch.nn.Dropout2d(0.2),
+            Down(in_features =  64, out_features =  128), #  128x16x16
+            torch.nn.Dropout2d(0.2),
+            Down(in_features =  128, out_features =  256), #  256x8x8
+            torch.nn.Dropout2d(0.2),
             #Down(in_features =  64, out_features = 128), # 128 x   8 x   8
             #Down(in_features = 128, out_features = 256), # 256 x   4 x   4
             torch.nn.Flatten(), # 4096 dimensional
-            torch.nn.Linear(1024, 256), # 512 dimensional
+            torch.nn.Linear(16384, 512), # 512 dimensional
             torch.nn.ReLU(), # Another ReLU
-            #torch.nn.Dropout(0.5),
-            torch.nn.Linear(256, 2) # Go down to two neurons, one for cats, one for dogs
+            torch.nn.Dropout(0.5),
+            torch.nn.Linear(512, 2) # Go down to two neurons, one for cats, one for dogs
         )
 
     def forward(self, x):

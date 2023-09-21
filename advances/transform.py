@@ -7,6 +7,8 @@ from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
 from device import DEVICE
 import random
 
+
+
 training_transform = transforms.Compose([
         transforms.Resize((320, 320), antialias=True),
         transforms.RandomRotation(15),
@@ -19,12 +21,19 @@ training_transform = transforms.Compose([
     )
 
 training_transform_64 = transforms.Compose([
-        transforms.Resize((80, 80), antialias=True),
+        #transforms.Resize((80, 80), antialias=True),
         transforms.RandomRotation(15),
-        transforms.CenterCrop((72, 72)),
-        transforms.RandomCrop((64, 64)),
+        transforms.CenterCrop((144, 144)),
+        transforms.RandomCrop((128, 128)),
         transforms.RandomHorizontalFlip(0.5),
         transforms.ColorJitter(0.3, 0.3, 0.3),
+        transforms.ConvertImageDtype(torch.float32)
+        ]
+    )
+
+validation_transform_64 = transforms.Compose([
+        #transforms.Resize((80, 80), antialias=True),
+        transforms.CenterCrop((128, 128)),
         transforms.ConvertImageDtype(torch.float32)
         ]
     )

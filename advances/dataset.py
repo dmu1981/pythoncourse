@@ -7,11 +7,14 @@ from torchvision.utils import make_grid
 from tqdm import tqdm
 import random
 from device import DEVICE
+TRAIN_SET_FOLDER = "f:\\data\\catsvsdogs\\train\\"
 
-TRAIN_SET_FOLDER = "D:\\data\\catsvsdogs\\train\\"
+resize_transform = transforms.Compose([
+    transforms.Resize((160, 160), antialias=True),
+])
 
 class CatsDogsDataSet(Dataset):
-    def __init__(self, folder, max_samples_per_class = None, transform=None):
+    def __init__(self, folder, max_samples_per_class = None, transform=None, is_validation=False):
         self.data = []
         cats = []
         dogs = []
@@ -21,6 +24,15 @@ class CatsDogsDataSet(Dataset):
             bar = tqdm(files, desc="Scanning images")
             for name in bar:
                 path = os.path.join(folder, name)
+
+                number = int(name.split('.')[1])
+                if is_validation:
+                    if number % 5 != 0:
+                        continue
+                else:
+                    if number % 5 == 0:
+                        continue
+
 
                 if name.startswith("dog"):
                     dogs.append(path)
@@ -47,17 +59,25 @@ class CatsDogsDataSet(Dataset):
                 
         self.transform = transform
 
+        # Start with an empty cache
+        self.cache = [(None, None) for i in range(len(self.data))]
+
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        path, label = self.data[idx]
-        image = read_image(path).to(DEVICE)
+        image, label = self.cache[idx]
+        if image is None or label is None:
+          path, label = self.data[idx]
+          image = read_image(path).to(DEVICE)
+          image = resize_transform(image)
+          label = torch.Tensor([label]).type(torch.LongTensor).to(DEVICE).reshape(-1)
+          self.cache[idx] = (image, label)
 
         if self.transform:
             image = self.transform(image)
 
-        return image, torch.Tensor([label]).type(torch.LongTensor).to(DEVICE).reshape(-1)
+        return image, label
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
