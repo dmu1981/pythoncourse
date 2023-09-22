@@ -7,7 +7,7 @@ from torchvision.utils import make_grid
 from tqdm import tqdm
 import random
 from device import DEVICE
-TRAIN_SET_FOLDER = "f:\\data\\catsvsdogs\\train\\"
+TRAIN_SET_FOLDER = "d:\\data\\catsvsdogs\\train\\"
 
 resize_transform = transforms.Compose([
     transforms.Resize((160, 160), antialias=True),

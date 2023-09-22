@@ -3,12 +3,12 @@ from torch.utils.data import DataLoader
 from device import DEVICE
 from transform import training_transform, validation_transform
 from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
-import numpy as np
+import json
 from network import Network
 from trainloop import Trainer
 from cache import DatasetCache
 
-class Trainer2(Trainer):
+class CheckpointTrainer(Trainer):
     def __init__(self, network, loss_function, chkpt_path):
       super().__init__(network, loss_function)
 
@@ -33,6 +33,13 @@ class Trainer2(Trainer):
         
         self.ep += 1
 
+        self.logger( {
+           "epoch": self.ep,
+           "training": { "loss": train_loss, "accuracy": train_acc },
+           "validation": { "loss": val_loss, "accuracy": val_acc }
+          }
+        )
+
         if val_acc > self.best_val_acc:
           self.best_val_acc = val_acc
           print("Validation accuracy is best, saving checkpoint")
@@ -44,13 +51,17 @@ class Trainer2(Trainer):
               "epoch": self.ep
           }, self.chkpt_path)
 
+    def logger(self, statistics):
+       print(json.dumps(statistics, indent=3))
+    
+
 if __name__ == "__main__":
     dataset = DatasetCache(
-      CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, is_validation=False), 
+      CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=600, is_validation=False), 
       transform=training_transform)
     
     dataset_val = DatasetCache(
-       CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, is_validation=True),
+       CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=600, is_validation=True),
        transform=validation_transform)
     
     dataloader = DataLoader(dataset, batch_size=200, shuffle=True)
@@ -59,6 +70,6 @@ if __name__ == "__main__":
     net = Network().to(DEVICE)
     loss = torch.nn.CrossEntropyLoss()
 
-    trainer = Trainer2(net, loss, "model.pt")
+    trainer = CheckpointTrainer(net, loss, "model.pt")
     trainer.train(dataloader, dataloader_val)
         
