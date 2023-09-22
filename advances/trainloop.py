@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from device import DEVICE
-from transform import training_transform_64
+from transform import training_transform
 from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
 import numpy as np
 from network import Network
@@ -77,7 +77,7 @@ class Trainer:
     return 1000.0 * total_loss / cnt, 100.0*correct/cnt
 
 if __name__ == "__main__":
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=2000, transform=training_transform_64)
+    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=2000, transform=training_transform)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     
     net = Network().to(DEVICE)

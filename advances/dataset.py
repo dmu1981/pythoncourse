@@ -59,25 +59,20 @@ class CatsDogsDataSet(Dataset):
                 
         self.transform = transform
 
-        # Start with an empty cache
-        self.cache = [(None, None) for i in range(len(self.data))]
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        image, label = self.cache[idx]
-        if image is None or label is None:
-          path, label = self.data[idx]
-          image = read_image(path).to(DEVICE)
-          image = resize_transform(image)
-          label = torch.Tensor([label]).type(torch.LongTensor).to(DEVICE).reshape(-1)
-          self.cache[idx] = (image, label)
+      path, label = self.data[idx]
+      image = read_image(path).to(DEVICE)
+      image = resize_transform(image)
+      label = torch.Tensor([label]).type(torch.LongTensor).to(DEVICE).reshape(-1)
 
-        if self.transform:
-            image = self.transform(image)
+      if self.transform:
+          image = self.transform(image)
 
-        return image, label
+      return image, label
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
@@ -91,11 +86,10 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     batch, label = dataloader.__iter__().__next__()
-    batch = torch.Tensor(batch)
+    #batch = torch.Tensor(batch)
     
     grid = make_grid(batch, 8, padding=4).permute(1,2,0)
-    print(label)
 
-    plt.imshow(grid)
+    plt.imshow(grid.cpu())
     plt.show()
 

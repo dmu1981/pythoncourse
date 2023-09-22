@@ -1,11 +1,12 @@
 import torch
 from torch.utils.data import DataLoader
 from device import DEVICE
-from transform import training_transform_64, validation_transform_64
+from transform import training_transform, validation_transform
 from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
 import numpy as np
 from network import Network
 from trainloop import Trainer
+from cache import DatasetCache
 
 class Trainer2(Trainer):
     def __init__(self, network, loss_function, chkpt_path):
@@ -44,8 +45,13 @@ class Trainer2(Trainer):
           }, self.chkpt_path)
 
 if __name__ == "__main__":
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, transform=training_transform_64, is_validation=False)
-    dataset_val = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, transform=validation_transform_64, is_validation=True)
+    dataset = DatasetCache(
+      CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, is_validation=False), 
+      transform=training_transform)
+    
+    dataset_val = DatasetCache(
+       CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, is_validation=True),
+       transform=validation_transform)
     
     dataloader = DataLoader(dataset, batch_size=200, shuffle=True)
     dataloader_val = DataLoader(dataset_val, batch_size=200, shuffle=True)

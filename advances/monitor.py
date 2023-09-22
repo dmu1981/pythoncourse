@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from device import DEVICE
-from transform import training_transform_64, validation_transform_64
+from transform import training_transform, validation_transform
 from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
 import numpy as np
 from network import Network
@@ -13,8 +13,8 @@ from trainloop import epoch
 if __name__ == "__main__":
     writer = SummaryWriter()
 
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, transform=training_transform_64, is_validation=False)
-    dataset_val = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, transform=validation_transform_64, is_validation=True)
+    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, transform=training_transform, is_validation=False)
+    dataset_val = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, transform=validation_transform, is_validation=True)
     
     dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
     dataloader_val = DataLoader(dataset_val, batch_size=256, shuffle=True)
@@ -39,7 +39,7 @@ if __name__ == "__main__":
         ls, acc = epoch(dataloader_val, net, optim, loss, False, ep)
         writer.add_scalar("val/loss", ls, ep)
         writer.add_scalar("val/acc", acc, ep)
-        
+
         ep += 1
 
         torch.save({

@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from device import DEVICE
-from transform import training_transform, training_transform_64
+from transform import training_transform, training_transform
 from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
 import numpy as np
 
@@ -32,8 +32,6 @@ class Network(torch.nn.Module):
             torch.nn.Dropout2d(0.2),
             Down(in_features =  128, out_features =  256), #  256x8x8
             torch.nn.Dropout2d(0.2),
-            #Down(in_features =  64, out_features = 128), # 128 x   8 x   8
-            #Down(in_features = 128, out_features = 256), # 256 x   4 x   4
             torch.nn.Flatten(), # 4096 dimensional
             torch.nn.Linear(16384, 512), # 512 dimensional
             torch.nn.ReLU(), # Another ReLU
@@ -45,7 +43,7 @@ class Network(torch.nn.Module):
         return self.seq(x)
 
 if __name__ == "__main__":
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=2000, transform=training_transform_64)
+    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=2000, transform=training_transform)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     net = Network().to(DEVICE)

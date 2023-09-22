@@ -10,18 +10,6 @@ import random
 
 
 training_transform = transforms.Compose([
-        transforms.Resize((320, 320), antialias=True),
-        transforms.RandomRotation(15),
-        transforms.CenterCrop((288, 288)),
-        transforms.RandomCrop((256, 256)),
-        transforms.RandomHorizontalFlip(0.5),
-        transforms.ColorJitter(0.3, 0.3, 0.3),
-        transforms.ConvertImageDtype(torch.float32)
-        ]
-    )
-
-training_transform_64 = transforms.Compose([
-        #transforms.Resize((80, 80), antialias=True),
         transforms.RandomRotation(15),
         transforms.CenterCrop((144, 144)),
         transforms.RandomCrop((128, 128)),
@@ -31,8 +19,7 @@ training_transform_64 = transforms.Compose([
         ]
     )
 
-validation_transform_64 = transforms.Compose([
-        #transforms.Resize((80, 80), antialias=True),
+validation_transform = transforms.Compose([
         transforms.CenterCrop((128, 128)),
         transforms.ConvertImageDtype(torch.float32)
         ]
@@ -48,7 +35,7 @@ if __name__ == "__main__":
     batch = None
     for index in range(32):
         transformed = training_transform(image)
-        transformed = transformed.reshape(1, 3, 256, 256)
+        transformed = transformed.reshape(1, 3, 128, 128)
         if batch is None:
             batch = transformed
         else:
