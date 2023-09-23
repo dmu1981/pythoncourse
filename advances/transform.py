@@ -28,7 +28,7 @@ validation_transform = transforms.Compose([
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
     
-    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=20)
+    dataset = CatsDogsDataSet(TRAIN_SET_FOLDER)
     
     image, label = dataset[int(random.uniform(0, len(dataset)))]
     
@@ -43,5 +43,5 @@ if __name__ == "__main__":
 
     grid = make_grid(batch, 8, padding=4).permute(1,2,0)
 
-    plt.imshow(grid)
+    plt.imshow(grid.cpu())
     plt.show()

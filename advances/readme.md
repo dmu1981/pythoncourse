@@ -210,3 +210,19 @@ Installieren und starten Sie tensorpoard
 
 Öffnen Sie http://localhost:6006/ in ihrem Browser um auf das TensorBoard zuzugreifen. 
 
+Um das interkative Tensorboard mit Daten zu befüllen erzeugen wir einen s.g. SummaryWriter
+
+    self.writer = SummaryWriter()
+
+und schreiben dann unsere Skalaren Meßgrößen über diesen Writer auf die Festplatte
+
+    def logger(self, statistics):
+        self.writer.add_scalar("train/loss", statistics["training"]["loss"], statistics["epoch"])
+        self.writer.add_scalar("train/accuracy", statistics["training"]["accuracy"], statistics["epoch"])
+        self.writer.add_scalar("validation/loss", statistics["validation"]["loss"], statistics["epoch"])
+        self.writer.add_scalar("validation/accuracy", statistics["validation"]["accuracy"], statistics["epoch"])
+
+Der TensorBoard Service überwacht den Ordner und lädt Änderungen on-the-fly nach. Die Werte werden dann in 
+interaktive Graphen im Browser dargestellt. 
+
+
