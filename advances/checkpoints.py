@@ -45,9 +45,7 @@ class CheckpointTrainer(Trainer):
           }
         )
 
-        #if val_acc > self.best_val_acc:
         self.best_val_acc = val_acc
-        print("Validation accuracy is best, saving checkpoint")
         torch.save({
             "net_state_dict": self.network.state_dict(),
             "optim_state_dict": self.optim.state_dict(),

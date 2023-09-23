@@ -117,7 +117,6 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     batch, label = dataloader.__iter__().__next__()
-    #batch = torch.Tensor(batch)
     
     grid = make_grid(batch, 8, padding=4).permute(1,2,0)
 
