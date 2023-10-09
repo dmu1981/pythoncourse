@@ -74,5 +74,5 @@ if __name__ == "__main__":
     loss = torch.nn.CrossEntropyLoss()
 
     trainer = CheckpointTrainer(net, loss, "model.pt")
-    trainer.train(dataloader, None)#dataloader_val)
+    trainer.train(dataloader, dataloader_val)
         

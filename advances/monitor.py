@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from device import DEVICE
 from transform import training_transform, validation_transform
-from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER
+from dataset import CatsDogsDataSet, TRAIN_SET_FOLDER, DataSetMode
 from cache import DatasetCache
 import numpy as np
 from network import Network
@@ -23,11 +23,11 @@ class MonitoredTrainer(CheckpointTrainer):
 
 if __name__ == "__main__":
     dataset = DatasetCache(
-      CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=600, is_validation=False), 
+      CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, mode=DataSetMode.Final), 
       transform=training_transform)
     
     dataset_val = DatasetCache(
-       CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=600, is_validation=True),
+       CatsDogsDataSet(TRAIN_SET_FOLDER, max_samples_per_class=None, mode=DataSetMode.Validation),
        transform=validation_transform)
     
     dataloader = DataLoader(dataset, batch_size=200, shuffle=True)
