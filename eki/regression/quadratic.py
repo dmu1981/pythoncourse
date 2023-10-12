@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 coords_x = np.array([1,2,3,4]).T
 coords_y = np.array([3,4,4,2]).T
 
-# Our linear model is y = w_0 + w_1 * x, w_2 * x**2 setup the X matrix and Y vector
+# Our linear model is y = w_0 + w_1 * x + w_2 * x**2 setup the X matrix and Y vector
 X = np.stack(
     [np.ones_like(coords_x), coords_x, coords_x**2],
     axis=1
