@@ -7,23 +7,25 @@ def f(x):
 def grad(x):
     return 4*x**3-20*x+10
 
-x = np.linspace(-3,3,50)
-y = [f(x) for x in x]
+# Plot the function itself
+x = np.linspace(-4.0, 4.0, 50)
+plt.plot(x, [f(x) for x in x], "r")
 
+# Do a gradient descent and plot the respective positions as well
+x0 = 0.8
 eta = 0.01
+xcoords, ycoords = [], []
+for i in range(40):
+    # Remember coordinate for plotting
+    xcoords.append(x0)
+    ycoords.append(f(x0))
+    
+    # Gradient descent
+    x0 = x0 - eta * grad(x0)    
 
-x0 = 0.6
+x = np.linspace(-4.0, 4.0, 50)
+plt.plot(x, [f(x) for x in x], "r")
 
-x_arr, y_arr = [], []
-
-for i in range(200):
-    x_arr.append(x0)
-    y_arr.append(f(x0))
-    x0 = x0 - eta * grad(x0)
-    #print(x0)
-
-
-plt.plot(x,y, "r")
-plt.plot(x_arr, y_arr, "b*")
-plt.plot(x_arr, y_arr, "k", linewidth=0.5)
+plt.plot(xcoords, ycoords, "k", linewidth=0.5)
+plt.plot(xcoords, ycoords, "b*")
 plt.show()
