@@ -2,8 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 # Define our points
-coords_x = np.array([1,2,3,4,8]).T
-coords_y = np.array([3,4,4,2,4]).T
+coords_x = np.array([1,2,3,4,8])
+coords_y = np.array([3,4,4,2,4])
 
 # Our linear model is y = w_0 + w_1 * sin(x) + w_2 * cos(x) setup the X matrix and Y vector
 X = np.stack(
