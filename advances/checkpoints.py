@@ -71,8 +71,8 @@ if __name__ == "__main__":
     dataloader_val = DataLoader(dataset_val, batch_size=200, shuffle=True)
     
     net = Network().to(DEVICE)
-    loss = torch.nn.CrossEntropyLoss()
+    loss = torch.nn.CrossEntropyLoss(reduction="none")
 
     trainer = CheckpointTrainer(net, loss, "model.pt")
-    trainer.train(dataloader, None)#dataloader_val)
+    trainer.train(dataloader, dataloader_val)
         

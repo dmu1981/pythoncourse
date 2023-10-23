@@ -17,9 +17,13 @@ class Trainer:
 
   def init_optimizer(self):
     self.optim = torch.optim.Adam(self.network.parameters(), lr=0.0001)
+    
 
   def init_scheduler(self):
     self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optim, 0.95)
+
+  def report_top_loss(self, top_loss_samples, epoch):
+    return None
 
   def epoch(self, dataloader, training, epoch=0):
     # We want a dedicated TQDM bar, so we can set the description after each step
@@ -38,6 +42,9 @@ class Trainer:
     correct = 0
     cnt = 0
 
+    top_loss_values = None
+    top_loss_samples = None
+
     # Iterate over the whole epoch
     for batch, labels in bar:
       # If we are training, zero out the gradients in the network
@@ -52,7 +59,18 @@ class Trainer:
 
       # Calculcate the (BCE)-Loss
       loss = self.loss_function(res, labels)
+      if top_loss_values is None:
+        top_loss_values = loss.detach()
+        top_loss_samples = batch.detach()
+      else:
+        top_loss_values = torch.cat([top_loss_values, loss.detach()])
+        top_loss_samples = torch.cat([top_loss_samples, batch.detach()])
+        
+        top_loss_values, indices = torch.sort(top_loss_values, descending=True)
+        top_loss_values = top_loss_values[:batch.shape[0]]
+        top_loss_samples = top_loss_samples[indices,:,:]
 
+      loss = torch.mean(loss)
       # Sum the total loss
       total_loss += loss.item()
 
@@ -74,6 +92,8 @@ class Trainer:
           # Step the optimizer
           self.optim.step()
 
+    self.report_top_loss(top_loss_samples, epoch)
+
     return 1000.0 * total_loss / cnt, 100.0*correct/cnt
 
 if __name__ == "__main__":
@@ -81,7 +101,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     
     net = Network().to(DEVICE)
-    loss = torch.nn.CrossEntropyLoss()
+    loss = torch.nn.CrossEntropyLoss(reduction="none")
 
     trainer = Trainer(net, loss)
     trainer.epoch(dataloader, net, True)

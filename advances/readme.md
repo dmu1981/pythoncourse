@@ -204,12 +204,19 @@ Das Laden eines Checkpoints von der Festplatte geschieht über die *torch.load* 
         print("Could not find checkpoint, starting from scratch")
 
 ## Das Training überwachen ([monitor.py](monitor.py))
-Installieren und starten Sie tensorpoard
+Installieren und starten Sie tensorboard
 
     pip install tensorboard
     tensorboard --logdir=runs
 
 Öffnen Sie http://localhost:6006/ in ihrem Browser um auf das TensorBoard zuzugreifen. 
+
+Hinweis:
+  Es kann sein das Sie die SETUPTOOLS von Python downgraden müssen (vgl. https://github.com/pytorch/pytorch/pull/69904)
+
+    pip install setuptools==59.5.0
+
+
 
 Um das interkative Tensorboard mit Daten zu befüllen erzeugen wir einen s.g. SummaryWriter
 

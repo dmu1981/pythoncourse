@@ -9,8 +9,8 @@ import random
 from enum import Enum
 from device import DEVICE
 
-TRAIN_SET_FOLDER = "f:\\data\\catsvsdogs\\train\\"
-TEST_SET_FOLDER = "f:\\data\\catsvsdogs\\test1\\"
+TRAIN_SET_FOLDER = "d:\\data\\catsvsdogs\\train\\"
+TEST_SET_FOLDER = "d:\\data\\catsvsdogs\\test1\\"
 
 resize_transform = transforms.Compose([
     transforms.Resize((160, 160), antialias=True),
