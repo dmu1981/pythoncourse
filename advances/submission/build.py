@@ -6,16 +6,17 @@ from PIL import Image
 from annoy import AnnoyIndex
 import csv
 
+
 def build(path):
     print("Building from path ", path)
 
     emb_dim = 512
-    index = AnnoyIndex(emb_dim, 'angular')
+    index = AnnoyIndex(emb_dim, "angular")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, preprocess = clip.load("ViT-B/32", device=device)    
+    model, preprocess = clip.load("ViT-B/32", device=device)
 
-    cnt = 0                  
+    cnt = 0
 
     csv_writer = csv.writer(open("index.csv", "wt", newline=""))
 
@@ -30,7 +31,7 @@ def build(path):
             with torch.no_grad():
                 image_features = model.encode_image(image)
                 index.add_item(cnt, image_features[0])
-    
+
             csv_writer.writerow([cnt, curpath])
 
             cnt = cnt + 1
@@ -38,6 +39,3 @@ def build(path):
     print("Building annoy database")
     index.build(16)
     index.save("annoy.db")
-
-
-
