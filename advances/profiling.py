@@ -18,7 +18,7 @@ if __name__ == "__main__":
   
     start = time.time()
     batch, labels = dataloader.__iter__().__next__()
-    with profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU], record_shapes=True) as prof:
+    with profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU], record_shapes=True, profile_memory=True, with_stack=True) as prof:
       with record_function("model_inference"):
         res = net(batch)
         
