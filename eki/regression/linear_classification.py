@@ -6,7 +6,7 @@ coords_x1 = np.array([-5,  0, 0,   5,  0, 5, 5, 10])
 coords_x2 = np.array([-5, -5, 0, -10, 10, 0, 5, 5])
 class_y = np.array([-1,-1,-1,-1,1,1,1,1])
 
-# Our linear model is y = w_0 + w1 * x1 + w_2 * x2, setup the X matrix and Y vector
+# Our linear model is y = w_0 + w1 * x1 + w_2 * x2, setup <the X matrix and Y vector
 X = np.stack([np.ones_like(coords_x1), coords_x1, coords_x2], axis=1)
 Y = class_y
 #print(X)
