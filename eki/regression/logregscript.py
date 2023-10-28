@@ -18,7 +18,7 @@ P = 1.0 / (1.0 + np.exp(-X @ model))
 print(P)
 
 eta = 0.01
-for _ in range(1000):
+for _ in range(10000):
   P = 1.0 / (1.0 + np.exp(-X @ model))
   
   delta = (y-P)
@@ -27,7 +27,7 @@ for _ in range(1000):
       np.sum(delta * x1_coords),
       np.sum(delta * x2_coords),
     ])
- 
+  print(grad)
   model = model + eta * grad
   
 
