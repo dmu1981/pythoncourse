@@ -137,16 +137,23 @@ class Adam(Optimizer):
     super().__init__()
     self.grad1 = np.array([0.0,0.0])
     self.grad2 = np.array([0.0,0.0])
+    self.beta1 = 0.9
+    self.beta2 = 0.999
+    self.beta1cor = 1.0
+    self.beta2cor = 1.0
 
   def run(self, pos):
     for i in range(1500):
       if not self.update(pos):
         break
 
+      self.beta1cor *= self.beta1
+      self.beta2cor *= self.beta2
+
       grad = evaluate_grad(pos)
-      self.grad1 = self.grad1 * 0.9 + 0.1 * (grad)
-      self.grad2 = self.grad2 * 0.999 + 0.001 * (grad ** 2)
-      pos = pos - eta * self.grad1 / np.sqrt(self.grad2) 
+      self.grad1 = self.grad1 * self.beta1 + (1-self.beta1) * (grad)
+      self.grad2 = self.grad2 * self.beta2 + (1-self.beta2) * (grad ** 2)
+      pos = pos - eta * (self.grad1 / (1.0-self.beta1cor)) / np.sqrt(self.grad2 / (1.0-self.beta2cor)) 
 
 pos = np.array([8.0,8.0])
 
@@ -167,7 +174,7 @@ optimAdam.run(pos)
 
 optims = [(optimSGD, "k"), 
           (optimMomentum, "g"),
-          (optimAdagrad, "b"),
+          (optimAdagrad, "b"),  
           (optimAdaDelta, "c"),
           (optimAdam, "r")]
 
@@ -178,7 +185,7 @@ for optim, color in optims:
 
 plt.ion()
 
-plt.contourf(xx,yy,z,levels=np.linspace(0,1,150), cmap="gray")
+plt.contourf(xx,yy,z,levels=np.linspace(0,1,150), cmap="bone")
 
 
 delay = 20 / optim.trace.shape[1]
