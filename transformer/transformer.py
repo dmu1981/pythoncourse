@@ -9,7 +9,8 @@ print(f"Device is {DEVICE}")
 
 BATCH_SIZE = 256
 EMB_DIM = 256
-SEQ_LEN = 80
+SEQ_LEN = 20
+N_TOKENS = 10
 
 class SelfAttention(nn.Module):
     def __init__(self, emb_dim, n_heads = 8):
@@ -22,12 +23,8 @@ class SelfAttention(nn.Module):
         self.Q = nn.Linear(emb_dim, emb_dim)
         self.K = nn.Linear(emb_dim, emb_dim)
         self.V = nn.Linear(emb_dim, emb_dim)
-
-        # self.Q = [nn.Linear(self.att_dim, self.att_dim).to(DEVICE) for _ in range(n_heads)]
-        # self.K = [nn.Linear(self.att_dim, self.att_dim).to(DEVICE) for _ in range(n_heads)]
-        # self.V = [nn.Linear(self.att_dim, self.att_dim).to(DEVICE) for _ in range(n_heads)]
-
-        pass
+        self.out = nn.Linear(emb_dim, emb_dim)
+        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
         res = torch.empty_like(x)
@@ -40,21 +37,10 @@ class SelfAttention(nn.Module):
             q_slice = Q[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)]
             k_slice = torch.transpose(K[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)], dim0=1,dim1=2)
             v_slice = V[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)]
+
+            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = self.dropout(torch.softmax((q_slice @ k_slice) / self.n_dim_norm, dim=2)) @ v_slice
             
-            # res = torch.softmax((q_slice @ k_slice) / self.n_dim_norm, dim=-1) @ v_slice
-            # print(res.shape)
-            # print(res)
-            # exit()
-
-            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = torch.matmul(torch.softmax((q_slice @ k_slice) / self.n_dim_norm, dim=2), v_slice)
-
-            # q = self.Q[indx](x_slice)
-            # k = torch.transpose(self.K[indx](x_slice), dim0=1, dim1=2)
-            # v = self.V[indx](x_slice)
-
-            # res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = torch.matmul(torch.softmax((q @ k) / self.n_dim_norm, dim=2), v)
-            
-        return res
+        return self.out(res)
     
 class MLP(nn.Module):
     def __init__(self, emb_dim, intermediate_dim):
@@ -63,6 +49,7 @@ class MLP(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(emb_dim, intermediate_dim),
             nn.ReLU(),
+            nn.Dropout(0.5),
             nn.Linear(intermediate_dim, emb_dim))
         
     def forward(self, x):
@@ -92,6 +79,7 @@ class Encoder(nn.Module):
         self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
         self.pos_encoding = nn.Embedding(num_embeddings=SEQ_LEN, embedding_dim=emb_dim)
         self.pos_indices = torch.Tensor(list(range(SEQ_LEN))).type(torch.long).to(DEVICE)
+        self.dropout = nn.Dropout(0.2)
         
         self.encoders = [
             EncoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
@@ -99,15 +87,8 @@ class Encoder(nn.Module):
             ]
 
     def forward(self, x):
-        # i = self.pos_encoding(torch.Tensor([0]).type(torch.long).to(DEVICE))
-        # print(i)
-        # Token encoding
-        x = self.embedding(x)
-        
-        # Positional encoding
-        pos = self.pos_encoding(self.pos_indices[:x.shape[1]])# / math.sqrt(self.emb_dim)
-        x += pos 
-
+        # Embeddings and positional encoding
+        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:x.shape[1]])
 
         # Encoder
         for encoder in self.encoders:
@@ -119,15 +100,12 @@ class Net(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.encoder = Encoder(n_tokens=20, emb_dim=64, intermediate_dim=256, n_layers=6, n_heads=8)
+        self.encoder = Encoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM * 4, n_layers=6, n_heads=8)
         self.relu = nn.ReLU()
-        self.fc = nn.Linear(64, 2)
-        self.flatten = nn.Flatten()
+        self.fc = nn.Linear(EMB_DIM, 2)
 
     def forward(self, x):
         x = self.encoder(x)[:,0,:]
-        #print(x.shape)
-        #x = self.flatten(x)
         return self.fc(x)
     
 class SymmetricSequences(torch.utils.data.Dataset):
@@ -139,7 +117,7 @@ class SymmetricSequences(torch.utils.data.Dataset):
         return BATCH_SIZE
     
     def __getitem__(self, idx):
-        seq = torch.trunc(torch.rand(self.seq_len) * 20).type(torch.long).to(DEVICE)
+        seq = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
         if random.uniform(0, 1) < .5:
           seq[self.seq_len//2:] = torch.flip(seq[:-self.seq_len//2], dims=[0])
           return seq, torch.Tensor([1]).type(torch.long).to(DEVICE)
@@ -181,20 +159,8 @@ net = Net().to(DEVICE)
 
 optim = torch.optim.Adam(net.parameters(), lr=0.001)
 criterion = torch.nn.CrossEntropyLoss()
-
-
-dataset = SymmetricSequences(40)
+dataset = SymmetricSequences(SEQ_LEN)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
-
-# batch, labels = dataloader.__iter__().__next__()
-# x = net(batch)
-# labels=labels.view(-1)
-# loss = criterion(x, labels)
-
-# print(batch, labels)
-# print(x, loss)
-#exit()
-
 warmup = Warmup(optim=optim, target_lr=0.01, warmup_steps=2000, min_lr=0.0001, cooldown_steps=100000)
 
 try:
@@ -215,8 +181,6 @@ for iter in bar:
   labels = labels.view(-1)
 
   optim.zero_grad()
-  # print(batch, labels)
-  # exit()
   x = net(batch)
   loss = criterion(x, labels)
 
@@ -228,9 +192,6 @@ for iter in bar:
   warmup.step()
 
   if iter % 50 == 0:
-    # print(batch)
-    # print(labels)
-    #print(x)
     bar.set_description(f"loss={total_loss / cnt * 1000.0:.3f}, acc={acc / cnt * 100:.3f}%")
     total_loss = 0
     cnt = 0
