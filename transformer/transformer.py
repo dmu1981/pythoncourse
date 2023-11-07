@@ -9,8 +9,8 @@ print(f"Device is {DEVICE}")
 
 BATCH_SIZE = 256
 EMB_DIM = 256
-SEQ_LEN = 20
-N_TOKENS = 10
+SEQ_LEN = 60
+N_TOKENS = 64
 
 class SelfAttention(nn.Module):
     def __init__(self, emb_dim, n_heads = 8):
