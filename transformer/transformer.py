@@ -26,7 +26,7 @@ class SelfAttention(nn.Module):
         self.out = nn.Linear(emb_dim, emb_dim)
         self.dropout = nn.Dropout(0.1)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         res = torch.empty_like(x)
 
         Q = self.Q(x)
@@ -38,7 +38,13 @@ class SelfAttention(nn.Module):
             k_slice = torch.transpose(K[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)], dim0=1,dim1=2)
             v_slice = V[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)]
 
-            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = self.dropout(torch.softmax((q_slice @ k_slice) / self.n_dim_norm, dim=2)) @ v_slice
+            scores = (q_slice @ k_slice) / self.n_dim_norm
+            if mask is not None:
+              scores = scores.masked_fill(mask == 0, -1e9)
+
+            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = self.dropout(
+                torch.softmax(scores, dim=2)
+                ) @ v_slice
             
         return self.out(res)
     
@@ -65,11 +71,10 @@ class EncoderLayer(nn.Module):
         self.layerNorm1 = nn.LayerNorm(emb_dim).to(DEVICE)
         self.layerNorm2 = nn.LayerNorm(emb_dim).to(DEVICE)
 
-    def forward(self, x):
-        x = self.layerNorm1(x + self.selfAttention(x))
+    def forward(self, x, mask=None):
+        x = self.layerNorm1(x + self.selfAttention(x, mask))
         x = self.layerNorm2(x + self.mlp(x))
-        return x
-    
+        return x    
     
 class Encoder(nn.Module):
     def __init__(self, n_tokens, emb_dim, intermediate_dim, n_layers=6, n_heads=8):
@@ -87,25 +92,69 @@ class Encoder(nn.Module):
             ]
 
     def forward(self, x):
+        seq_len = x.shape[1]
+
         # Embeddings and positional encoding
-        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:x.shape[1]])
+        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:seq_len])
 
         # Encoder
         for encoder in self.encoders:
             x = encoder(x)
 
         return x
+    
+class Decoder(nn.Module):
+    def __init__(self, n_tokens, emb_dim, intermediate_dim, n_layers=6, n_heads=8):
+        super().__init__()
+
+        self.emb_dim = emb_dim
+        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
+        self.pos_encoding = nn.Embedding(num_embeddings=SEQ_LEN, embedding_dim=emb_dim)
+        self.pos_indices = torch.Tensor(list(range(SEQ_LEN))).type(torch.long).to(DEVICE)
+        self.dropout = nn.Dropout(0.2)
+        
+        self.decoders = [
+            EncoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
+            for _ in range(n_layers)
+            ]
+
+    def forward(self, x, encoded):
+        seq_len = x.shape[1]
+        mask = 1.0 - torch.triu(torch.ones((seq_len, seq_len))).to(DEVICE)
+
+        # Embeddings and positional encoding
+        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:seq_len])
+
+        # Encoder
+        for index, decoder in enumerate(self.decoders):
+            if index == 0:
+              x = decoder(x, mask) + encoded
+            else:
+              x = decoder(x)
+
+        return x    
+
+class Transformer(nn.Module):
+    def __init__(self, n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8):
+        super().__init__()
+
+        self.encoder = Encoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
+        self.decoder = Decoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
+
+    def forward(self, source_sequence, target_sequence):
+        encoded = self.encoder(source_sequence)
+        return self.decoder(target_sequence, encoded)
 
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.encoder = Encoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM * 4, n_layers=6, n_heads=8)
+        self.transformer = Transformer(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
         self.relu = nn.ReLU()
         self.fc = nn.Linear(EMB_DIM, 2)
 
-    def forward(self, x):
-        x = self.encoder(x)[:,0,:]
+    def forward(self, inp, tgt):
+        x = self.transformer(inp, tgt)[:,0,:]
         return self.fc(x)
     
 class SymmetricSequences(torch.utils.data.Dataset):
@@ -116,16 +165,19 @@ class SymmetricSequences(torch.utils.data.Dataset):
     def __len__(self):
         return BATCH_SIZE
     
-    def __getitem__(self, idx):
-        seq = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+    def __getitem__(self, idx):        
         if random.uniform(0, 1) < .5:
-          seq[self.seq_len//2:] = torch.flip(seq[:-self.seq_len//2], dims=[0])
-          return seq, torch.Tensor([1]).type(torch.long).to(DEVICE)
+            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            seq2 = torch.flip(seq1, dims=[0])
+            return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
         else:
-          return seq, torch.Tensor([0]).type(torch.long).to(DEVICE)
+            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            seq2 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
+        
 
 class Warmup():
-    def __init__(self, optim, target_lr = 0.01, min_lr = 0.0001, warmup_steps = 1000, cooldown_steps = 10000):
+    def __init__(self, optim, target_lr = 0.01, min_lr = 0.0001, warmup_steps = 200, cooldown_steps = 5000):
         self.optim = optim
         self.target_lr = target_lr
         self.min_lr = min_lr
@@ -161,7 +213,7 @@ optim = torch.optim.Adam(net.parameters(), lr=0.001)
 criterion = torch.nn.CrossEntropyLoss()
 dataset = SymmetricSequences(SEQ_LEN)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
-warmup = Warmup(optim=optim, target_lr=0.01, warmup_steps=2000, min_lr=0.0001, cooldown_steps=100000)
+warmup = Warmup(optim=optim, target_lr=0.01, warmup_steps=6000, min_lr=0.0001, cooldown_steps=36000)
 
 try:
     chkpt = torch.load("model.pt")
@@ -171,23 +223,22 @@ try:
 except:
     print("Could not load model, starting from scratch!")
 
-                
 bar = tqdm(range(1000000))
 total_loss = 0
 cnt = 0
 acc = 0
 for iter in bar:  
-  batch, labels = dataloader.__iter__().__next__()
+  inp, tgt, labels = dataloader.__iter__().__next__()
   labels = labels.view(-1)
 
   optim.zero_grad()
-  x = net(batch)
+  x = net(inp, tgt)
   loss = criterion(x, labels)
 
   loss.backward()
   acc += torch.sum(torch.argmax(x, dim=1) == labels)
   total_loss += loss.item()
-  cnt += batch.shape[0]
+  cnt += tgt.shape[0]
   optim.step()
   warmup.step()
 
