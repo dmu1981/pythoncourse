@@ -9,9 +9,31 @@ print(f"Device is {DEVICE}")
 
 BATCH_SIZE = 256
 EMB_DIM = 256
-SEQ_LEN = 12
-N_TOKENS = 8
-DROPOUT = 0
+SEQ_LEN = 30
+N_TOKENS = 30
+DROPOUT = False
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, seq_len, emb_dim):
+        super().__init__()
+
+        self.seq_len = seq_len
+        self.emb_dim = emb_dim
+
+        self.encodings = torch.zeros(seq_len, emb_dim)
+        for dim_index in range(0, emb_dim, 2):
+            freq = 10000 ** (dim_index / emb_dim)
+            
+            for position_index in range(seq_len):
+                self.encodings[position_index][dim_index+0] = math.sin(position_index / freq)
+                self.encodings[position_index][dim_index+1] = math.cos(position_index / freq)
+
+        self.encodings = self.encodings.to(DEVICE) * math.sqrt(emb_dim)
+        self.register_buffer("pe", self.encodings)
+
+    def forward(self, x):
+        return x + self.encodings[:x.shape[1],:]
+
 
 class SelfAttention(nn.Module):
     def __init__(self, emb_dim, n_heads = 8):
@@ -25,7 +47,7 @@ class SelfAttention(nn.Module):
         self.K = nn.Linear(emb_dim, emb_dim)
         self.V = nn.Linear(emb_dim, emb_dim)
         self.out = nn.Linear(emb_dim, emb_dim)
-        self.dropout = nn.Dropout(0.1 * DROPOUT)
+        self.dropout = nn.Dropout(0.1) if DROPOUT else nn.Identity()
 
     def forward(self, xv, xk, xq, mask=None):
         
@@ -57,7 +79,7 @@ class MLP(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(emb_dim, intermediate_dim),
             nn.ReLU(),
-            nn.Dropout(0.5 * DROPOUT),
+            nn.Dropout(0.5) if DROPOUT else nn.Identity(),
             nn.Linear(intermediate_dim, emb_dim))
         
     def forward(self, x):
@@ -101,10 +123,10 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.emb_dim = emb_dim
-        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
-        self.pos_encoding = nn.Embedding(num_embeddings=SEQ_LEN, embedding_dim=emb_dim)
-        self.pos_indices = torch.Tensor(list(range(SEQ_LEN))).type(torch.long).to(DEVICE)
-        self.dropout = nn.Dropout(0.2 * DROPOUT)
+        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)        
+        self.pos_encoding = PositionalEncoding(SEQ_LEN, emb_dim=emb_dim)
+
+        self.dropout = nn.Dropout(0.2) if DROPOUT else nn.Identity()
         
         self.encoders = [
             EncoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
@@ -112,10 +134,9 @@ class Encoder(nn.Module):
             ]
 
     def forward(self, x):
-        seq_len = x.shape[1]
-
         # Embeddings and positional encoding
-        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:seq_len])
+        x = self.dropout(self.embedding(x))
+        x = self.pos_encoding(x)
 
         # Encoder
         for encoder in self.encoders:
@@ -129,9 +150,10 @@ class Decoder(nn.Module):
 
         self.emb_dim = emb_dim
         self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
-        self.pos_encoding = nn.Embedding(num_embeddings=SEQ_LEN, embedding_dim=emb_dim)
-        self.pos_indices = torch.Tensor(list(range(SEQ_LEN))).type(torch.long).to(DEVICE)
-        self.dropout = nn.Dropout(0.2 * DROPOUT)
+
+        self.pos_encoding = PositionalEncoding(SEQ_LEN, emb_dim=emb_dim)
+
+        self.dropout = nn.Dropout(0.2) if DROPOUT else nn.Identity()
         
         self.decoders = [
             DecoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
@@ -143,7 +165,8 @@ class Decoder(nn.Module):
         mask = 1.0 - torch.triu(torch.ones((seq_len, seq_len))).to(DEVICE)
 
         # Embeddings and positional encoding
-        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:seq_len])
+        x = self.dropout(self.embedding(x))
+        x = self.pos_encoding(x)
 
         # Encoder
         for decoder in self.decoders:
@@ -155,8 +178,8 @@ class Transformer(nn.Module):
     def __init__(self, n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8):
         super().__init__()
 
-        self.encoder = Encoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
-        self.decoder = Decoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
+        self.encoder = Encoder(n_tokens=n_tokens, emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_layers=n_layers, n_heads=n_heads)
+        self.decoder = Decoder(n_tokens=n_tokens, emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_layers=n_layers, n_heads=n_heads)
 
     def forward(self, source_sequence, target_sequence):
         encoded = self.encoder(source_sequence)
@@ -167,7 +190,6 @@ class Net(nn.Module):
         super().__init__()
 
         self.transformer = Transformer(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
-        self.relu = nn.ReLU()
         self.fc = nn.Linear(EMB_DIM, 2)
 
     def forward(self, inp, tgt):
@@ -183,14 +205,14 @@ class SymmetricSequences(torch.utils.data.Dataset):
         return BATCH_SIZE
     
     def __getitem__(self, idx):        
-        # if random.uniform(0, 1) < .5:
-        #     seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-        #     seq2 = torch.flip(seq1, dims=[0])
-        #     return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
-        # else:
-        #     seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-        #     seq2 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-        #     return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
+        if random.uniform(0, 1) < .5:
+            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            seq2 = torch.flip(seq1, dims=[0])
+            return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
+        else:
+            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            seq2 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
 
         if random.uniform(0, 1) < .5:
             seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
@@ -230,10 +252,10 @@ class Warmup():
         self.steps += 1
         if self.steps < self.warmup_steps:
           ratio = self.steps / self.warmup_steps
-          lr = self.target_lr * ratio
+          lr = self.min_lr + ratio * (self.target_lr - self.min_lr)
         elif self.steps < self.cooldown_steps:
           ratio = 1.0 - (self.steps - self.warmup_steps) / (self.cooldown_steps - self.warmup_steps)
-          lr = self.min_lr + ratio * self.target_lr
+          lr = self.min_lr + ratio * (self.target_lr - self.min_lr)
         else:
           lr = self.min_lr
 
@@ -244,11 +266,12 @@ class Warmup():
 
 net = Net().to(DEVICE)
 
+
 optim = torch.optim.Adam(net.parameters(), lr=0.001)
 criterion = torch.nn.CrossEntropyLoss()
 dataset = SymmetricSequences(SEQ_LEN)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
-warmup = Warmup(optim=optim, target_lr=0.01, warmup_steps=6000, min_lr=0.0001, cooldown_steps=36000)
+warmup = Warmup(optim=optim, target_lr=0.02, warmup_steps=2000, min_lr=0.0001, cooldown_steps=100000)
 
 try:
     chkpt = torch.load("model.pt")
