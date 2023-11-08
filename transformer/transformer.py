@@ -27,7 +27,8 @@ class SelfAttention(nn.Module):
         self.out = nn.Linear(emb_dim, emb_dim)
         self.dropout = nn.Dropout(0.1 * DROPOUT)
 
-    def forward(self, xq, xk, xv, mask=None):
+    def forward(self, xv, xk, xq, mask=None):
+        
         res = torch.empty_like(xq)
 
         Q = self.Q(xq)
@@ -182,13 +183,31 @@ class SymmetricSequences(torch.utils.data.Dataset):
         return BATCH_SIZE
     
     def __getitem__(self, idx):        
+        # if random.uniform(0, 1) < .5:
+        #     seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+        #     seq2 = torch.flip(seq1, dims=[0])
+        #     return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
+        # else:
+        #     seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+        #     seq2 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+        #     return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
+
         if random.uniform(0, 1) < .5:
             seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            seq2 = torch.flip(seq1, dims=[0])
+            
+            seq2 = torch.empty_like(seq1[:self.seq_len//2])
+            for i in range(self.seq_len//2):
+                seq2[i] = (seq1[2*i] + seq1[2*i+1]) % N_TOKENS
+            #seq2 = (torch.flip(seq2, dims=[0]) + N_TOKENS // 2) % N_TOKENS
+
+            #print(seq1)
+            #print(seq2)
+            #exit()
+            
             return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
         else:
             seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            seq2 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            seq2 = torch.trunc(torch.rand(self.seq_len//2) * N_TOKENS).type(torch.long).to(DEVICE)
             return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
         
 
