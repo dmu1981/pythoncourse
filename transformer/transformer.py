@@ -7,10 +7,10 @@ from tqdm import tqdm
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device is {DEVICE}")
 
-BATCH_SIZE = 3000
-EMB_DIM = 256
-SEQ_LEN = 30
-N_TOKENS = 20
+BATCH_SIZE = 200
+EMB_DIM = 32
+SEQ_LEN = 16
+N_TOKENS = 10
 PAD_TOKEN = N_TOKENS - 1
 
 DROPOUT = False
@@ -130,10 +130,10 @@ class Encoder(nn.Module):
 
         self.dropout = nn.Dropout(0.2) if DROPOUT else nn.Identity()
         
-        self.encoders = [
+        self.encoders = nn.ModuleList([
             EncoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
             for _ in range(n_layers)
-            ]
+            ])
 
     def forward(self, x, src_mask):
         # Embeddings and positional encoding
@@ -157,10 +157,10 @@ class Decoder(nn.Module):
 
         self.dropout = nn.Dropout(0.2) if DROPOUT else nn.Identity()
         
-        self.decoders = [
+        self.decoders = nn.ModuleList([
             DecoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
             for _ in range(n_layers)
-            ]
+            ])
 
     def forward(self, x, encoded):
         seq_len = x.shape[1]
@@ -213,7 +213,7 @@ class SymmetricSequences(torch.utils.data.Dataset):
         return BATCH_SIZE
     
     def __getitem__(self, idx):
-        len = round(random.uniform(1, self.seq_len//2)) * 2
+        len = round(random.uniform(1, self.seq_len))
 
         LAST_TOKEN = N_TOKENS - 1
         if random.uniform(0, 1) < .5:
@@ -251,7 +251,7 @@ class Warmup():
     def step(self):
         self.steps += 1
         if self.steps < self.warmup_steps:
-          ratio = self.steps / self.warmup_steps
+          ratio = self.steps / self.warmup_steps          
           lr = self.min_lr + ratio * (self.target_lr - self.min_lr)
         elif self.steps < self.cooldown_steps:
           ratio = 1.0 - (self.steps - self.warmup_steps) / (self.cooldown_steps - self.warmup_steps)
@@ -271,7 +271,7 @@ optim = torch.optim.Adam(net.parameters(), lr=0.001)
 criterion = torch.nn.CrossEntropyLoss()
 dataset = SymmetricSequences(SEQ_LEN)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
-warmup = Warmup(optim=optim, target_lr=0.2, warmup_steps=200, min_lr=0.0001, cooldown_steps=100000)
+warmup = Warmup(optim=optim, target_lr=0.001, warmup_steps=1000, min_lr=0.0001, cooldown_steps=100000)
 
 try:
     chkpt = torch.load("model.pt")
@@ -300,13 +300,13 @@ for iter in bar:
   optim.step()
   warmup.step()
 
-  if iter % 5 == 0:
+  if iter % 50 == 0:
     bar.set_description(f"loss={total_loss / cnt * 1000.0:.3f}, acc={acc / cnt * 100:.3f}%")
     total_loss = 0
     cnt = 0
     acc = 0
 
-  if iter % 5 == 0:
+  if iter % 50 == 0:
     try:
       chkpt = torch.save({
         "model": net.state_dict(),
