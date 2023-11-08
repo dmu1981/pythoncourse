@@ -7,10 +7,12 @@ from tqdm import tqdm
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device is {DEVICE}")
 
-BATCH_SIZE = 256
+BATCH_SIZE = 3000
 EMB_DIM = 256
 SEQ_LEN = 30
-N_TOKENS = 30
+N_TOKENS = 20
+PAD_TOKEN = N_TOKENS - 1
+
 DROPOUT = False
 
 class PositionalEncoding(nn.Module):
@@ -133,14 +135,14 @@ class Encoder(nn.Module):
             for _ in range(n_layers)
             ]
 
-    def forward(self, x):
+    def forward(self, x, src_mask):
         # Embeddings and positional encoding
         x = self.dropout(self.embedding(x))
-        x = self.pos_encoding(x)
+        x = self.pos_encoding(x)       
 
         # Encoder
         for encoder in self.encoders:
-            x = encoder(x)
+            x = encoder(x, src_mask)
 
         return x
     
@@ -182,7 +184,13 @@ class Transformer(nn.Module):
         self.decoder = Decoder(n_tokens=n_tokens, emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_layers=n_layers, n_heads=n_heads)
 
     def forward(self, source_sequence, target_sequence):
-        encoded = self.encoder(source_sequence)
+        BS = source_sequence.shape[0]
+        src_mask = torch.empty(BS, SEQ_LEN, SEQ_LEN).to(DEVICE)
+        mask = 1.0 - 1.0 * (source_sequence == PAD_TOKEN)
+        for idx in range(source_sequence.shape[0]):
+            src_mask[idx,:,:] = torch.outer(mask[idx], mask[idx])
+
+        encoded = self.encoder(source_sequence, src_mask)
         return self.decoder(target_sequence, encoded)
 
 class Net(nn.Module):
@@ -204,33 +212,25 @@ class SymmetricSequences(torch.utils.data.Dataset):
     def __len__(self):
         return BATCH_SIZE
     
-    def __getitem__(self, idx):        
+    def __getitem__(self, idx):
+        len = round(random.uniform(1, self.seq_len//2)) * 2
+
+        LAST_TOKEN = N_TOKENS - 1
         if random.uniform(0, 1) < .5:
-            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
+            seq1 = torch.trunc(torch.rand(len) * LAST_TOKEN).type(torch.long).to(DEVICE)
             seq2 = torch.flip(seq1, dims=[0])
-            return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
+            cls = 1
         else:
-            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            seq2 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
+            seq1 = torch.trunc(torch.rand(len) * LAST_TOKEN).type(torch.long).to(DEVICE)
+            seq2 = torch.trunc(torch.rand(len) * LAST_TOKEN).type(torch.long).to(DEVICE)
+            cls = 0
 
-        if random.uniform(0, 1) < .5:
-            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            
-            seq2 = torch.empty_like(seq1[:self.seq_len//2])
-            for i in range(self.seq_len//2):
-                seq2[i] = (seq1[2*i] + seq1[2*i+1]) % N_TOKENS
-            #seq2 = (torch.flip(seq2, dims=[0]) + N_TOKENS // 2) % N_TOKENS
+        # Padding
+        seq1 = torch.concat((seq1, torch.ones(self.seq_len - len).type(torch.long).to(DEVICE) * PAD_TOKEN))
+        seq2 = torch.concat((seq2, torch.ones(self.seq_len - len).type(torch.long).to(DEVICE) * PAD_TOKEN))        
 
-            #print(seq1)
-            #print(seq2)
-            #exit()
-            
-            return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
-        else:
-            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            seq2 = torch.trunc(torch.rand(self.seq_len//2) * N_TOKENS).type(torch.long).to(DEVICE)
-            return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
+        return seq1, seq2, torch.Tensor([cls]).type(torch.long).to(DEVICE)
+
         
 
 class Warmup():
@@ -271,7 +271,7 @@ optim = torch.optim.Adam(net.parameters(), lr=0.001)
 criterion = torch.nn.CrossEntropyLoss()
 dataset = SymmetricSequences(SEQ_LEN)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
-warmup = Warmup(optim=optim, target_lr=0.02, warmup_steps=2000, min_lr=0.0001, cooldown_steps=100000)
+warmup = Warmup(optim=optim, target_lr=0.2, warmup_steps=200, min_lr=0.0001, cooldown_steps=100000)
 
 try:
     chkpt = torch.load("model.pt")
@@ -300,13 +300,13 @@ for iter in bar:
   optim.step()
   warmup.step()
 
-  if iter % 50 == 0:
+  if iter % 5 == 0:
     bar.set_description(f"loss={total_loss / cnt * 1000.0:.3f}, acc={acc / cnt * 100:.3f}%")
     total_loss = 0
     cnt = 0
     acc = 0
 
-  if iter % 500 == 0:
+  if iter % 5 == 0:
     try:
       chkpt = torch.save({
         "model": net.state_dict(),
