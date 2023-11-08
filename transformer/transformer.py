@@ -72,7 +72,7 @@ class MLP(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(emb_dim, intermediate_dim),
             nn.ReLU(),
-            nn.Dropout(0.1) if dropout else nn.Identity(),
+            nn.Dropout(0.2) if dropout else nn.Identity(),
             nn.Linear(intermediate_dim, emb_dim))
         
     def forward(self, x):
