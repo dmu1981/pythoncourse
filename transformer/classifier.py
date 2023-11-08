@@ -10,8 +10,8 @@ print(f"Device is {DEVICE}")
 
 BATCH_SIZE = 500
 EMB_DIM = 64
-SEQ_LEN = 16
-N_TOKENS = 16
+SEQ_LEN = 32
+N_TOKENS = 32
 PAD_TOKEN = N_TOKENS - 1
 
 DROPOUT = False
