@@ -4,11 +4,10 @@ import random
 import math
 
 class Seq2SeqDataset(torch.utils.data.Dataset):
-  def __init__(self, src, tgt, SOS_token, EOS_token, PAD_token, PAD_len, factor):
+  def __init__(self, baseSet, SOS_token, EOS_token, PAD_token, PAD_len, factor):
     super().__init__()
 
-    self.src = src
-    self.tgt = tgt
+    self.baseSet = baseSet
     self.SOS = SOS_token
     self.EOS = EOS_token
     self.PAD = PAD_token
@@ -16,14 +15,14 @@ class Seq2SeqDataset(torch.utils.data.Dataset):
     self.factor = factor
 
   def __len__(self):
-    return len(self.src) * self.factor
+    return len(self.baseSet) * self.factor
   
   def __getitem__(self, idx):
     # Normalize index
-    idx = idx % len(self.src)
+    idx = idx % len(self.baseSet)
 
     # Get the base sequence pair
-    src, tgt = self.src[idx], self.tgt[idx]
+    src, tgt = self.baseSet[idx]
 
     # Get the device we need to operate on
     dvc = tgt.device
@@ -39,14 +38,8 @@ class Seq2SeqDataset(torch.utils.data.Dataset):
     tgt = tgt[:cut]
 
     # Now pad the sequence
-    tgt = torch.concat((tgt, torch.ones(self.PAD_len - tgt.shape[0]).to(dvc) * self.PAD))
+    src = torch.concat((src, torch.ones(self.PAD_len - src.shape[0]).to(dvc) * self.PAD)).type(torch.long)
+    tgt = torch.concat((tgt, torch.ones(self.PAD_len - tgt.shape[0]).to(dvc) * self.PAD)).type(torch.long)
 
-    return src, tgt, token_to_predict
+    return src, tgt, token_to_predict.type(torch.long).to(dvc)
   
-baseSet = torch.Tensor([
-    [0,1,2,3,4,5,6,7,8,9]
-    ]).to("cuda")
-  
-mySet = Seq2SeqDataset(baseSet, baseSet, 10, 11, 12, 8, 50)
-for src, tgt, target_token in mySet:
-  print(tgt, target_token)

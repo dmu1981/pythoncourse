@@ -40,7 +40,7 @@ class SelfAttention(nn.Module):
         self.K = nn.Linear(emb_dim, emb_dim)
         self.V = nn.Linear(emb_dim, emb_dim)
         self.out = nn.Linear(emb_dim, emb_dim)
-        self.dropout = nn.Identity() # nn.Dropout(0.1) if dropout else nn.Identity()
+        self.dropout = nn.Dropout(0.1) if dropout else nn.Identity()
 
     def forward(self, xv, xk, xq, mask=None):
         
@@ -179,6 +179,11 @@ class Transformer(nn.Module):
 
         self.encoder = Encoder(seq_len=seq_len, n_tokens=n_tokens, emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_layers=n_layers, n_heads=n_heads, dropout=dropout)
         self.decoder = Decoder(seq_len=seq_len, n_tokens=n_tokens, emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_layers=n_layers, n_heads=n_heads, dropout=dropout)
+        self.mlp = nn.Sequential(
+            nn.Linear(emb_dim, intermediate_dim),
+            nn.GELU(),
+            nn.Linear(intermediate_dim, n_tokens)
+            )
 
     def forward(self, source_sequence, target_sequence):
         BS = source_sequence.shape[0]
@@ -188,7 +193,9 @@ class Transformer(nn.Module):
             src_mask[idx,:,:] = torch.outer(mask[idx], mask[idx])
 
         encoded = self.encoder(source_sequence, src_mask)
-        return self.decoder(target_sequence, encoded)
+        decoded = self.decoder(target_sequence, encoded)
+
+        return self.mlp(decoded[:,0,:])
     
         
 

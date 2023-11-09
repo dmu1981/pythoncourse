@@ -4,6 +4,7 @@ import math
 import random
 from tqdm import tqdm
 import transformer
+import sequenceset
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device is {DEVICE}")
@@ -12,23 +13,13 @@ BATCH_SIZE = 500
 EMB_DIM = 64
 SEQ_LEN = 32
 N_TOKENS = 32
-PAD_TOKEN = N_TOKENS - 1
+PAD_TOKEN = 0
+SOS_TOKEN = 1
+EOS_TOKEN = 2
 
 DROPOUT = False
-
-
-class Net(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.transformer = transformer.Transformer(seq_len=SEQ_LEN, n_tokens=N_TOKENS, pad_token=PAD_TOKEN, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=2, n_heads=4, dropout=False)
-        self.fc = nn.Linear(N_TOKENS, 2)
-
-    def forward(self, inp, tgt):
-        x = self.transformer(inp, tgt)
-        return self.fc(x)
-    
-class SymmetricSequences(torch.utils.data.Dataset):
+   
+class RandomSequences(torch.utils.data.Dataset):
     def __init__(self, seq_len):
         self.seq_len = seq_len
         pass
@@ -39,37 +30,31 @@ class SymmetricSequences(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         len = round(random.uniform(1, self.seq_len))
 
-        LAST_TOKEN = N_TOKENS - 1
-        if random.uniform(0, 1) < .5:
-            seq1 = torch.trunc(torch.rand(len) * LAST_TOKEN).type(torch.long).to(DEVICE)
-            seq2 = torch.flip(seq1, dims=[0])
-            cls = 1
-        else:
-            seq1 = torch.trunc(torch.rand(len) * LAST_TOKEN).type(torch.long).to(DEVICE)
-            seq2 = torch.trunc(torch.rand(len) * LAST_TOKEN).type(torch.long).to(DEVICE)
-            cls = 0
+        seq1 = torch.trunc(EOS_TOKEN + 1 + torch.rand(len) * (N_TOKENS - EOS_TOKEN - 1)).type(torch.long).to(DEVICE)
 
-        # Padding
-        seq1 = torch.concat((seq1, torch.ones(self.seq_len - len).type(torch.long).to(DEVICE) * PAD_TOKEN))
-        seq2 = torch.concat((seq2, torch.ones(self.seq_len - len).type(torch.long).to(DEVICE) * PAD_TOKEN))        
-
-        return seq1, seq2, torch.Tensor([cls]).type(torch.long).to(DEVICE)
+        return seq1, seq1
 
 
+net = transformer.Transformer(
+   seq_len=SEQ_LEN, 
+   n_tokens=N_TOKENS, 
+   pad_token=PAD_TOKEN, 
+   emb_dim=EMB_DIM, 
+   intermediate_dim=EMB_DIM*4, 
+   n_layers=2, 
+   n_heads=4, 
+   dropout=False).to(DEVICE)
 
-        
-
-net = Net().to(DEVICE)
-
+dataset = sequenceset.Seq2SeqDataset(RandomSequences(SEQ_LEN), SOS_TOKEN, EOS_TOKEN, PAD_TOKEN, SEQ_LEN, 1)
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
 
 optim = torch.optim.Adam(net.parameters(), lr=0.001)
 criterion = torch.nn.CrossEntropyLoss()
-dataset = SymmetricSequences(SEQ_LEN)
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
+
 warmup = transformer.Warmup(optim=optim, target_lr=0.01, warmup_steps=10000, min_lr=0.000001, cooldown_steps=100000)
 
 try:
-    chkpt = torch.load("model.pt")
+    chkpt = torch.load("seq2seq.pt")
     net.load_state_dict(chkpt["model"])
     optim.load_state_dict(chkpt["optim"])
     warmup.load_state_dict(chkpt["scheduler"])
@@ -111,6 +96,6 @@ for iter in bar:
         "model": net.state_dict(),
         "optim": optim.state_dict(),
         "scheduler": warmup.state_dict()
-      }, "model.pt")
+      }, "seq2seq.pt")
     except:
       print("Could not save model!")
