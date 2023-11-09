@@ -28,11 +28,19 @@ class RandomSequences(torch.utils.data.Dataset):
         return BATCH_SIZE
     
     def __getitem__(self, idx):
-        len = round(random.uniform(1, self.seq_len))
+        len = round(random.uniform(4, self.seq_len//2))*2
 
         seq1 = torch.trunc(EOS_TOKEN + 1 + torch.rand(len) * (N_TOKENS - EOS_TOKEN - 1)).type(torch.long).to(DEVICE)
 
-        return seq1, seq1
+        seq2 = torch.zeros(seq1.shape[0] // 2).to(DEVICE)
+        for idx in range(0, seq1.shape[0]-1, 2):
+          seq2[idx//2] = (seq1[idx] + seq1[idx+1]) % (N_TOKENS - 3) + 3
+
+        seq2 = torch.flip(seq1, dims=[0])
+        #print("1:", seq1)
+        #print("2:", seq2)
+
+        return seq1, seq2
 
 
 net = transformer.Transformer(
