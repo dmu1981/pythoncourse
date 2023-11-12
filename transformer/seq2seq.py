@@ -7,6 +7,7 @@ from tqdm import tqdm
 import transformer
 import sequenceset
 import swipes as swp
+import balancedaccuracy
 
 writer = SummaryWriter()
 
@@ -62,17 +63,9 @@ except:
 bar = tqdm(range(1,1000000))
 total_loss = 0
 cnt = 0
-acc = 0
 nrm = 0
 
-token_cnt = {}
-token_acc = {}
-for token in indices.values():
-   if token == PAD_TOKEN or token == SOS_TOKEN:
-       continue
-   
-   token_acc[token] = 0
-   token_cnt[token] = 0
+balancedAccuracy = balancedaccuracy.BalancedAccuracy([PAD_TOKEN, SOS_TOKEN])
 
 dataiterator =  dataloader.__iter__()
 for iter in bar:  
@@ -92,15 +85,7 @@ for iter in bar:
 
   loss.backward()
 
-  for token in indices.values():
-     if token == PAD_TOKEN or token == SOS_TOKEN:
-       continue
-     
-     idx = (labels == token)
-     token_acc[token] += torch.sum(torch.argmax(x[idx], dim=1) == token).item()
-     token_cnt[token] += torch.sum(idx).item()
-  
-  acc += torch.sum(torch.argmax(x, dim=1) == labels)
+  balancedAccuracy.update(torch.argmax(x, dim=1).tolist(), labels.tolist())
 
   total_loss += loss.item()
   cnt += tgt.shape[0]
@@ -108,33 +93,21 @@ for iter in bar:
   optim.step()
 
   if iter % 100 == 0:
-    acc_dct = { token_to_char(token): 100.0 * token_acc[token] / (token_cnt[token]+0.001) for token in token_acc.keys() }
-    
-    bacc = 0
-    for token in acc_dct.keys():
-      bacc += acc_dct[token] 
-    bacc /= len(indices.values())    
+    bacc_dct, bacc, acc = balancedAccuracy.get()
+    bacc_dct = { token_to_char(token): bacc_dct[token] for token in bacc_dct.keys() }
+    balancedAccuracy.reset()
 
-    bar.set_description(f"loss={total_loss / cnt * 1000.0:.3f}, acc={acc / cnt * 100:.3f}%, bacc={bacc:.3f}%, norm={tgt.shape[0] * nrm / cnt:.3f}")
+    bar.set_description(f"loss={total_loss / cnt * 1000.0:.3f}, acc={acc * 100:.3f}%, bacc={100*bacc:.3f}%, norm={tgt.shape[0] * nrm / cnt:.3f}")
 
     writer.add_scalar("loss", total_loss / cnt * 1000.0, iter)
-    writer.add_scalar("accuracy", acc / cnt * 100, iter)
+    writer.add_scalar("accuracy", acc * 100, iter)
     writer.add_scalar("gradient_norm", tgt.shape[0] * nrm / cnt, iter)
-    writer.add_scalar("balanced_accuracy", bacc, iter)
+    writer.add_scalar("balanced_accuracy", bacc * 100, iter)
 
-    writer.add_scalars("token_accuracy", acc_dct, iter)      
-
-    token_cnt = {}
-    token_acc = {}
-    for token in indices.values():
-      if token == PAD_TOKEN or token == SOS_TOKEN:
-        continue
-
-      token_acc[token] = 0
-      token_cnt[token] = 0
+    writer.add_scalars("token_accuracy", bacc_dct, iter)      
 
     total_loss = 0
-    cnt, acc, nrm = 0, 0, 0
+    cnt, nrm = 0, 0
 
     try:
       chkpt = torch.save({
