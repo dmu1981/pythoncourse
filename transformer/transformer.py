@@ -57,7 +57,7 @@ class SelfAttention(nn.Module):
         self.att_dim = emb_dim // n_heads
         self.n_dim_norm = math.sqrt(self.att_dim)
 
-        self.dropout = DimDropout(1, 0.5)# if dropout else nn.Identity()
+        self.dropout = DimDropout(1, 0.5) if dropout else nn.Identity()
 
         self.Q = nn.Linear(emb_dim, emb_dim)
         self.K = nn.Linear(emb_dim, emb_dim)
@@ -222,16 +222,39 @@ class Transformer(nn.Module):
             )
 
     def forward(self, source_sequence, target_sequence):
+        encoded = self.encode(source_sequence)
+        return self.decode(target_sequence, encoded)
+
+    def decode(self, target_sequence, encoded):
+        decoded = self.decoder(target_sequence, encoded)
+
+        return self.mlp(decoded[:,0,:])
+    
+    def encode(self, source_sequence):
         BS = source_sequence.shape[0]
         src_mask = torch.empty(BS, self.seq_len, self.seq_len).to(DEVICE)
         mask = 1.0 - 1.0 * (source_sequence == self.pad_token)
         for idx in range(source_sequence.shape[0]):
             src_mask[idx,:,:] = torch.outer(mask[idx], mask[idx])
 
-        encoded = self.encoder(source_sequence, src_mask)
-        decoded = self.decoder(target_sequence, encoded)
-
-        return self.mlp(decoded[:,0,:])
+        return self.encoder(source_sequence, src_mask)
+        
     
+    def seq2seq(self, source_sequence, sos_token, eos_token):
+        target_sequence = torch.ones(self.seq_len).to(source_sequence.device).to(torch.long).view(1,-1) * self.pad_token
+        target_sequence[0] = sos_token
+
+        encoded = self.encode(source_sequence.view(1,-1))
+        idx = 1
+        while idx < self.seq_len:
+          res = torch.argmax(self.decode(target_sequence, encoded))
+          target_sequence[0,idx] = res
+          idx += 1
+          if res == eos_token:
+              break
+
+        return target_sequence[0]
+
+
         
 
