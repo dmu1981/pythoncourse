@@ -9,6 +9,7 @@ import sequenceset
 import swipes as swp
 import balancedaccuracy
 import infinityiterator
+import checkpointmanager
 
 writer = SummaryWriter()
 
@@ -54,12 +55,16 @@ net = transformer.Transformer(
 optim = torch.optim.AdamW(net.parameters(), lr=0.001, weight_decay=0.01)
 criterion = torch.nn.CrossEntropyLoss(reduction="none")
 
+chkptManager = checkpointmanager.CheckpointManager("swipes_v8")
+
 try:
-    chkpt = torch.load("swipes8.pt")
+    chkptName = chkptManager.get_best_checkpoint()
+    print(f"Starting with checkpoint {chkptName}")
+    chkpt = torch.load(chkptName)
     net.load_state_dict(chkpt["model"])
     optim.load_state_dict(chkpt["optim"])
 except:
-    print("Could not load model, starting from scratch!")
+    print("Could not load checkpoint, starting from scratch!")
 
 bar = tqdm(range(1,1000000))
 total_loss = 0
@@ -67,7 +72,6 @@ cnt = 0
 nrm = 0
 
 balancedAccuracy = balancedaccuracy.BalancedAccuracy([PAD_TOKEN, SOS_TOKEN])
-
 dataiterator = infinityiterator.InfinityIterator(dataloader)
 
 for iter in bar:  
@@ -110,6 +114,6 @@ for iter in bar:
       chkpt = torch.save({
         "model": net.state_dict(),
         "optim": optim.state_dict(),
-      }, "swipes8.pt")
+      }, chkptManager.new_checkpoint_file(bacc, clean_as_well=True))
     except:
       print("Could not save model!")
