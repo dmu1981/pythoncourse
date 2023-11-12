@@ -39,8 +39,12 @@ class SelfAttention(nn.Module):
         self.Q = nn.Linear(emb_dim, emb_dim)
         self.K = nn.Linear(emb_dim, emb_dim)
         self.V = nn.Linear(emb_dim, emb_dim)
-        self.out = nn.Linear(emb_dim, emb_dim)
-        self.dropout = nn.Dropout(0.1)# if dropout else nn.Identity()
+        self.out = nn.Sequential(
+            nn.Linear(emb_dim, emb_dim),
+            nn.GELU()
+        )
+
+        self.dropout = nn.Dropout(0.1) if dropout else nn.Identity()
 
     def forward(self, xv, xk, xq, mask=None):
         
@@ -71,13 +75,23 @@ class MLP(nn.Module):
 
         self.mlp = nn.Sequential(
             nn.Linear(emb_dim, intermediate_dim),
-            nn.ReLU(),
-            nn.Dropout(0.5),# if dropout else nn.Identity(),
-            nn.Linear(intermediate_dim, emb_dim))
+            nn.GELU(),
+            nn.Dropout(0.5) if dropout else nn.Identity(),
+            nn.Linear(intermediate_dim, emb_dim),
+            nn.GELU()
+            )
         
     def forward(self, x):
         return self.mlp(x)
-    
+
+class ResidualBlock(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.alpha = nn.Parameter(torch.Tensor([0.01]), requires_grad=True)
+
+    def forward(self, xIn, xOut):
+        return xIn + self.alpha * xOut
+
 class EncoderLayer(nn.Module):
     def __init__(self, emb_dim, intermediate_dim, n_heads=8):
         super().__init__()
@@ -85,18 +99,13 @@ class EncoderLayer(nn.Module):
         self.selfAttention = SelfAttention(emb_dim=emb_dim, n_heads=n_heads).to(DEVICE)
         self.mlp = MLP(emb_dim=emb_dim, intermediate_dim=intermediate_dim).to(DEVICE)        
 
-        self.layerNorm1 = nn.LayerNorm(emb_dim).to(DEVICE)
-        self.layerNorm2 = nn.LayerNorm(emb_dim).to(DEVICE)
-
-        self.a1 = nn.Parameter(torch.Tensor([0.01]), requires_grad=True)
-        self.a2 = nn.Parameter(torch.Tensor([0.01]), requires_grad=True)
-        self.gelu = nn.GELU()
+        self.residual1 = ResidualBlock()
+        self.residual2 = ResidualBlock()
 
     def forward(self, x, mask=None):
-        x = x + self.gelu(self.a1 * self.selfAttention(x, x, x, mask))
-        x = x + self.gelu(self.a2 * self.mlp(x))
-        #x = self.layerNorm1(x + self.selfAttention(x, x, x, mask))
-        #x = self.layerNorm2(x + self.mlp(x))
+        x = self.residual1(x, self.selfAttention(x, x, x, mask))
+        x = self.residual2(x, self.mlp(x))
+
         return x   
 
 class DecoderLayer(nn.Module):
@@ -107,23 +116,15 @@ class DecoderLayer(nn.Module):
         self.encoderAttention = SelfAttention(emb_dim=emb_dim, n_heads=n_heads).to(DEVICE)
         self.mlp = MLP(emb_dim=emb_dim, intermediate_dim=intermediate_dim).to(DEVICE)        
 
-        self.layerNorm1 = nn.LayerNorm(emb_dim).to(DEVICE)
-        self.layerNorm2 = nn.LayerNorm(emb_dim).to(DEVICE)
-        self.layerNorm3 = nn.LayerNorm(emb_dim).to(DEVICE)
-
-        self.a1 = nn.Parameter(torch.Tensor([0.01]), requires_grad=True)
-        self.a2 = nn.Parameter(torch.Tensor([0.01]), requires_grad=True)
-        self.a3 = nn.Parameter(torch.Tensor([0.01]), requires_grad=True)
-        self.gelu = nn.GELU()
+        self.residual1 = ResidualBlock()
+        self.residual2 = ResidualBlock()
+        self.residual3 = ResidualBlock()
 
     def forward(self, x, encoded, mask=None):
-        x = x + self.gelu(self.a1 * self.selfAttention(x, x, x, mask))
-        x = x + self.gelu(self.a2 * self.selfAttention(encoded, encoded, x))
-        x = x + self.gelu(self.a3 * self.mlp(x))
+        x = self.residual1(x, self.selfAttention(x, x, x, mask))
+        x = self.residual2(x, self.selfAttention(encoded, encoded, x, mask))
+        x = self.residual3(x, self.mlp(x))
 
-        # x = self.layerNorm1(x + self.selfAttention(x, x, x, mask))
-        # x = self.layerNorm2(x + self.selfAttention(encoded, encoded, x))
-        # x = self.layerNorm3(x + self.mlp(x))
         return x       
     
 class Encoder(nn.Module):
@@ -135,8 +136,7 @@ class Encoder(nn.Module):
         self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)        
         self.pos_encoding = PositionalEncoding(seq_len, emb_dim=emb_dim)
 
-        self.dropout = nn.Dropout(0.2)# if dropout else nn.Identity()
-        
+        self.dropout = nn.Dropout(0.2) if dropout else nn.Identity()        
         
         self.encoders = nn.ModuleList([
             EncoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
@@ -159,13 +159,12 @@ class Decoder(nn.Module):
         super().__init__()
 
         self.seq_len = seq_len
-
         self.emb_dim = emb_dim
-        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
 
+        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
         self.pos_encoding = PositionalEncoding(self.seq_len, emb_dim=emb_dim)
 
-        self.dropout = nn.Dropout(0.2)# if dropout else nn.Identity()
+        self.dropout = nn.Dropout(0.2) if dropout else nn.Identity()
         
         self.decoders = nn.ModuleList([
             DecoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
@@ -214,37 +213,4 @@ class Transformer(nn.Module):
         return self.mlp(decoded[:,0,:])
     
         
-
-class Warmup():
-    def __init__(self, optim, target_lr = 0.01, min_lr = 0.0001, warmup_steps = 200, cooldown_steps = 5000):
-        self.optim = optim
-        self.target_lr = target_lr
-        self.min_lr = min_lr
-        self.warmup_steps = warmup_steps
-        self.cooldown_steps = cooldown_steps
-        self.steps = 0
-
-    def state_dict(self):
-        return { "steps": self.steps }
-    
-    def load_state_dict(self, dct):
-        self.steps = dct["steps"]
-
-    def step(self):
-        self.steps += 1
-        if self.steps < self.warmup_steps:
-          ratio = self.steps / self.warmup_steps          
-          lr = self.min_lr + ratio * (self.target_lr - self.min_lr)
-        elif self.steps < self.cooldown_steps:
-          ratio = 1.0 - (self.steps - self.warmup_steps) / (self.cooldown_steps - self.warmup_steps)
-          lr = self.min_lr + ratio * (self.target_lr - self.min_lr)
-        else:
-          lr = self.min_lr
-
-        for param_group in self.optim.param_groups:
-            param_group['lr'] = lr
-
-
-
-
 
