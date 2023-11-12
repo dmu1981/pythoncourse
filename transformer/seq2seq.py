@@ -8,6 +8,7 @@ import transformer
 import sequenceset
 import swipes as swp
 import balancedaccuracy
+import infinityiterator
 
 writer = SummaryWriter()
 
@@ -67,14 +68,10 @@ nrm = 0
 
 balancedAccuracy = balancedaccuracy.BalancedAccuracy([PAD_TOKEN, SOS_TOKEN])
 
-dataiterator =  dataloader.__iter__()
-for iter in bar:  
-  try:
-    inp, tgt, labels = dataiterator.__next__()
-  except:
-    dataiterator = dataloader.__iter__()
-    inp, tgt, labels = dataiterator.__next__()    
+dataiterator = infinityiterator.InfinityIterator(dataloader)
 
+for iter in bar:  
+  inp, tgt, labels = dataiterator.__next__()
   labels = labels.view(-1)
 
   optim.zero_grad()
