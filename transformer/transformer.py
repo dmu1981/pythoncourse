@@ -27,6 +27,27 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         return x + self.encodings[:x.shape[1],:]
 
+class DimDropout(nn.Module):
+    def __init__(self, dim, p=0.5):
+        super().__init__()
+
+        self.dim = dim
+        self.p=p
+
+    def forward(self, x):
+        if self.training:
+          shape = list(x.shape)
+          del shape[self.dim]
+          shape=torch.Size(shape)
+
+          res = (torch.rand(size=shape, device=x.device) > self.p).unsqueeze(self.dim)
+          shape = [1 for _ in range(len(res.shape))]
+          shape[self.dim] = x.shape[self.dim]
+          res = res.repeat(torch.Size(shape))
+
+          return x * res
+        else:
+          return x
 
 class SelfAttention(nn.Module):
     def __init__(self, emb_dim, n_heads = 8, dropout = True):
@@ -36,6 +57,8 @@ class SelfAttention(nn.Module):
         self.att_dim = emb_dim // n_heads
         self.n_dim_norm = math.sqrt(self.att_dim)
 
+        self.dropout = DimDropout(1, 0.5)# if dropout else nn.Identity()
+
         self.Q = nn.Linear(emb_dim, emb_dim)
         self.K = nn.Linear(emb_dim, emb_dim)
         self.V = nn.Linear(emb_dim, emb_dim)
@@ -43,8 +66,6 @@ class SelfAttention(nn.Module):
             nn.Linear(emb_dim, emb_dim),
             nn.GELU()
         )
-
-        self.dropout = nn.Dropout(0.1) if dropout else nn.Identity()
 
     def forward(self, xv, xk, xq, mask=None):
         
@@ -59,13 +80,13 @@ class SelfAttention(nn.Module):
             k_slice = torch.transpose(K[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)], dim0=1,dim1=2)
             v_slice = V[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)]
 
+            k_slice = self.dropout(k_slice)
+
             scores = (q_slice @ k_slice) / self.n_dim_norm
             if mask is not None:
               scores = scores.masked_fill(mask == 0, -1e9)
 
-            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = self.dropout(
-                torch.softmax(scores, dim=2)
-                ) @ v_slice
+            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = torch.softmax(scores, dim=2) @ v_slice
             
         return self.out(res)
     
