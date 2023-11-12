@@ -22,7 +22,7 @@ class Seq2SeqDataset(torch.utils.data.Dataset):
     idx = idx % len(self.baseSet)
 
     # Get the base sequence pair
-    src, tgt = self.baseSet[idx]
+    src, tgt, w = self.baseSet[idx]
 
     # Get the device we need to operate on
     dvc = tgt.device
@@ -41,5 +41,5 @@ class Seq2SeqDataset(torch.utils.data.Dataset):
     src = torch.concat((src, torch.ones(self.PAD_len - src.shape[0]).to(dvc) * self.PAD)).type(torch.long)
     tgt = torch.concat((tgt, torch.ones(self.PAD_len - tgt.shape[0]).to(dvc) * self.PAD)).type(torch.long)
 
-    return src, tgt, token_to_predict.type(torch.long).to(dvc)
+    return src, tgt, token_to_predict.type(torch.long).to(dvc), w
   

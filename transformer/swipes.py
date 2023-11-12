@@ -6,31 +6,51 @@ from tqdm import tqdm
 import random
 import sequenceset
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Device is {DEVICE}")
+# DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# print(f"Device is {DEVICE}")
 
-MAX_SEQ_LEN = 100
+#MAX_SEQ_LEN = 100
 
 class Swipes(torch.utils.data.Dataset):
   def __len__(self):
     return len(self.input_swipes)
   
   def __getitem__(self, index):
-    return self.input_swipes[index], self.target_sequences[index]#, self.weights[index]
+    return self.input_swipes[index], self.target_sequences[index], self.sentence_weights[index]
   
-  def __init__(self, datafile, max_lines = 5000):
+  def token_to_char(self, token):
+    for key in self.indices.keys():
+      if self.indices[key] == token:
+        return key
+      
+    return "UNK"
+  
+  def get_n_tokens(self):
+    return self.next_index
+
+  def get_pad_token(self):
+    return self.pad_index
+  
+  def get_sos_token(self):
+    return self.sos_index
+  
+  def get_eos_token(self):
+    return self.eos_index
+  
+  def __init__(self, datafile, max_lines = 5000, max_seq_len=100, device="cpu"):
     self.indices = {}
     self.count = {}
     self.next_index = 0
+    self.device = device
 
     self.input_swipes = []
     self.target_sequences = []
     self.sentence_weights = []
 
 
-    self.max_seq_len = MAX_SEQ_LEN
+    self.max_seq_len = max_seq_len
     self.pad_index = self.char_to_index("PAD") # Padding Token
-    self.sos_index = self.char_to_index("SOS") # Star7t of SWIPE
+    self.sos_index = self.char_to_index("SOS") # Start of SWIPE
     self.eos_index = self.char_to_index("EOS") # End of SWIPE
 
     lines = []
@@ -72,18 +92,16 @@ class Swipes(torch.utils.data.Dataset):
   def sequence_to_indices(self, sequence):
     sequence = ''.join([c for c in sequence if c in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]])
     seq = [self.char_to_index(x) for x in sequence]
-    seq = seq[:(MAX_SEQ_LEN - 1)]
-    #while len(seq) < MAX_SEQ_LEN:
-      #seq.append(self.eos_index)
+    seq = seq[:(self.max_seq_len - 1)]
 
-    return torch.tensor(seq).to(DEVICE)
+    return torch.tensor(seq).to(self.device)
 
   def add(self, input, output, weight):
     inp = self.sequence_to_indices(input)
     out = self.sequence_to_indices(output)
     self.input_swipes.append(inp)
     self.target_sequences.append(out)
-    self.sentence_weights.append(weight)
+    self.sentence_weights.append(torch.Tensor([weight]).to(self.device))
 
 if __name__ == "__main__":
   swipes = Swipes("training-data_50_swipes.txt", max_lines=10000) 

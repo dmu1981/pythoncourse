@@ -16,36 +16,20 @@ writer = SummaryWriter()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device is {DEVICE}")
 
-swipes = swp.Swipes("training-data_50_swipes.txt", max_lines=512) 
-indices = swipes.indices
-token_weights = swipes.token_weights
-
-PAD_TOKEN = swipes.pad_index
-SOS_TOKEN = swipes.sos_index
-EOS_TOKEN = swipes.eos_index
+SEQ_LEN = 100
 BATCH_SIZE = 256
 EMB_DIM = 60
-SEQ_LEN = swp.MAX_SEQ_LEN
-N_TOKENS = swipes.next_index
 
-print(swipes.indices)
-swipes = sequenceset.Seq2SeqDataset(swipes, swipes.sos_index, swipes.eos_index, swipes.pad_index, SEQ_LEN, 1)
-  
-dataloader = torch.utils.data.DataLoader(swipes, batch_size=BATCH_SIZE, shuffle=True)      
+swipes = swp.Swipes("training-data_50_swipes.txt", max_lines=512, max_seq_len=SEQ_LEN, device=DEVICE) 
+seq2seq = sequenceset.Seq2SeqDataset(swipes, swipes.get_sos_token(), swipes.get_eos_token(), swipes.get_pad_token(), SEQ_LEN, 1)  
+dataloader = torch.utils.data.DataLoader(seq2seq, batch_size=BATCH_SIZE, shuffle=True)      
 
 DROPOUT = False
 
-def token_to_char(token):
-  for key in indices.keys():
-    if indices[key] == token:
-      return key
-      
-  return "<UNK>"
-
 net = transformer.Transformer(
    seq_len=SEQ_LEN, 
-   n_tokens=N_TOKENS, 
-   pad_token=PAD_TOKEN, 
+   n_tokens=swipes.get_n_tokens(), 
+   pad_token=swipes.get_pad_token(), 
    emb_dim=EMB_DIM, 
    intermediate_dim=EMB_DIM*4, 
    n_layers=2, 
@@ -71,18 +55,18 @@ total_loss = 0
 cnt = 0
 nrm = 0
 
-balancedAccuracy = balancedaccuracy.BalancedAccuracy([PAD_TOKEN, SOS_TOKEN])
+balancedAccuracy = balancedaccuracy.BalancedAccuracy([swipes.get_pad_token(), swipes.get_sos_token()])
 dataiterator = infinityiterator.InfinityIterator(dataloader)
 
 for iter in bar:  
-  inp, tgt, labels = dataiterator.__next__()
+  inp, tgt, labels, sentence_weights = dataiterator.__next__()
   labels = labels.view(-1)
 
   optim.zero_grad()
   x = net(inp, tgt)
   loss = criterion(x, labels)
-  w = torch.Tensor([token_weights[token.item()] for token in labels]).to(DEVICE)
-  loss = torch.sum(loss * w)
+  w = torch.Tensor([swipes.token_weights[token.item()] for token in labels]).to(DEVICE)
+  loss = torch.sum(loss * w * sentence_weights) / torch.sum(w * sentence_weights)
 
   loss.backward()
 
@@ -95,7 +79,7 @@ for iter in bar:
 
   if iter % 100 == 0:
     bacc_dct, bacc, acc = balancedAccuracy.get()
-    bacc_dct = { token_to_char(token): bacc_dct[token] for token in bacc_dct.keys() }
+    bacc_dct = { swipes.token_to_char(token): bacc_dct[token] for token in bacc_dct.keys() }
     balancedAccuracy.reset()
 
     bar.set_description(f"loss={total_loss / cnt * 1000.0:.3f}, acc={acc * 100:.3f}%, bacc={100*bacc:.3f}%, norm={tgt.shape[0] * nrm / cnt:.3f}")
