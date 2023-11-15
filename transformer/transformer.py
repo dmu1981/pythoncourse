@@ -5,27 +5,67 @@ import random
 from tqdm import tqdm
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Device is {DEVICE}")
 
-BATCH_SIZE = 256
-EMB_DIM = 256
-SEQ_LEN = 12
-N_TOKENS = 8
-DROPOUT = 0
+class PositionalEncoding(nn.Module):
+    def __init__(self, seq_len, emb_dim):
+        super().__init__()
+
+        self.seq_len = seq_len
+        self.emb_dim = emb_dim
+
+        self.encodings = torch.zeros(seq_len, emb_dim)
+        for dim_index in range(0, emb_dim, 2):
+            freq = 10000 ** (dim_index / emb_dim)
+            
+            for position_index in range(seq_len):
+                self.encodings[position_index][dim_index+0] = math.sin(position_index / freq)
+                self.encodings[position_index][dim_index+1] = math.cos(position_index / freq)
+
+        self.encodings = self.encodings.to(DEVICE) * math.sqrt(emb_dim)
+        self.register_buffer("pe", self.encodings)
+
+    def forward(self, x):
+        return x + self.encodings[:x.shape[1],:]
+
+class DimDropout(nn.Module):
+    def __init__(self, dim, p=0.5):
+        super().__init__()
+
+        self.dim = dim
+        self.p=p
+
+    def forward(self, x):
+        if self.training:
+          shape = list(x.shape)
+          del shape[self.dim]
+          shape=torch.Size(shape)
+
+          res = (torch.rand(size=shape, device=x.device) > self.p).unsqueeze(self.dim)
+          shape = [1 for _ in range(len(res.shape))]
+          shape[self.dim] = x.shape[self.dim]
+          res = res.repeat(torch.Size(shape))
+
+          return x * res
+        else:
+          return x
 
 class SelfAttention(nn.Module):
-    def __init__(self, emb_dim, n_heads = 8):
+    def __init__(self, emb_dim, n_heads = 8, dropout = True):
         super().__init__()
 
         self.n_heads = n_heads
         self.att_dim = emb_dim // n_heads
         self.n_dim_norm = math.sqrt(self.att_dim)
 
+        self.dropout = DimDropout(1, 0.5) if dropout else nn.Identity()
+
         self.Q = nn.Linear(emb_dim, emb_dim)
         self.K = nn.Linear(emb_dim, emb_dim)
         self.V = nn.Linear(emb_dim, emb_dim)
-        self.out = nn.Linear(emb_dim, emb_dim)
-        self.dropout = nn.Dropout(0.1 * DROPOUT)
+        self.out = nn.Sequential(
+            nn.Linear(emb_dim, emb_dim),
+            nn.GELU()
+        )
 
     def forward(self, xv, xk, xq, mask=None):
         
@@ -40,29 +80,39 @@ class SelfAttention(nn.Module):
             k_slice = torch.transpose(K[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)], dim0=1,dim1=2)
             v_slice = V[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)]
 
+            k_slice = self.dropout(k_slice)
+
             scores = (q_slice @ k_slice) / self.n_dim_norm
             if mask is not None:
               scores = scores.masked_fill(mask == 0, -1e9)
 
-            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = self.dropout(
-                torch.softmax(scores, dim=2)
-                ) @ v_slice
+            res[:,:,(indx*self.att_dim):((indx+1)*self.att_dim)] = torch.softmax(scores, dim=2) @ v_slice
             
         return self.out(res)
     
 class MLP(nn.Module):
-    def __init__(self, emb_dim, intermediate_dim):
+    def __init__(self, emb_dim, intermediate_dim, dropout=True):
         super().__init__()
 
         self.mlp = nn.Sequential(
             nn.Linear(emb_dim, intermediate_dim),
-            nn.ReLU(),
-            nn.Dropout(0.5 * DROPOUT),
-            nn.Linear(intermediate_dim, emb_dim))
+            nn.GELU(),
+            nn.Dropout(0.5) if dropout else nn.Identity(),
+            nn.Linear(intermediate_dim, emb_dim),
+            nn.GELU()
+            )
         
     def forward(self, x):
         return self.mlp(x)
-    
+
+class ResidualBlock(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.alpha = nn.Parameter(torch.Tensor([0.01]), requires_grad=True)
+
+    def forward(self, xIn, xOut):
+        return xIn + self.alpha * xOut
+
 class EncoderLayer(nn.Module):
     def __init__(self, emb_dim, intermediate_dim, n_heads=8):
         super().__init__()
@@ -70,12 +120,13 @@ class EncoderLayer(nn.Module):
         self.selfAttention = SelfAttention(emb_dim=emb_dim, n_heads=n_heads).to(DEVICE)
         self.mlp = MLP(emb_dim=emb_dim, intermediate_dim=intermediate_dim).to(DEVICE)        
 
-        self.layerNorm1 = nn.LayerNorm(emb_dim).to(DEVICE)
-        self.layerNorm2 = nn.LayerNorm(emb_dim).to(DEVICE)
+        self.residual1 = ResidualBlock()
+        self.residual2 = ResidualBlock()
 
     def forward(self, x, mask=None):
-        x = self.layerNorm1(x + self.selfAttention(x, x, x, mask))
-        x = self.layerNorm2(x + self.mlp(x))
+        x = self.residual1(x, self.selfAttention(x, x, x, mask))
+        x = self.residual2(x, self.mlp(x))
+
         return x   
 
 class DecoderLayer(nn.Module):
@@ -86,64 +137,68 @@ class DecoderLayer(nn.Module):
         self.encoderAttention = SelfAttention(emb_dim=emb_dim, n_heads=n_heads).to(DEVICE)
         self.mlp = MLP(emb_dim=emb_dim, intermediate_dim=intermediate_dim).to(DEVICE)        
 
-        self.layerNorm1 = nn.LayerNorm(emb_dim).to(DEVICE)
-        self.layerNorm2 = nn.LayerNorm(emb_dim).to(DEVICE)
-        self.layerNorm3 = nn.LayerNorm(emb_dim).to(DEVICE)
+        self.residual1 = ResidualBlock()
+        self.residual2 = ResidualBlock()
+        self.residual3 = ResidualBlock()
 
     def forward(self, x, encoded, mask=None):
-        x = self.layerNorm1(x + self.selfAttention(x, x, x, mask))
-        x = self.layerNorm2(x + self.selfAttention(encoded, encoded, x))
-        x = self.layerNorm3(x + self.mlp(x))
+        x = self.residual1(x, self.selfAttention(x, x, x, mask))
+        x = self.residual2(x, self.selfAttention(encoded, encoded, x, mask))
+        x = self.residual3(x, self.mlp(x))
+
         return x       
     
 class Encoder(nn.Module):
-    def __init__(self, n_tokens, emb_dim, intermediate_dim, n_layers=6, n_heads=8):
+    def __init__(self, seq_len, n_tokens, emb_dim, intermediate_dim, n_layers=6, n_heads=8, dropout=True):
         super().__init__()
 
+        self.seq_len = seq_len
         self.emb_dim = emb_dim
-        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
-        self.pos_encoding = nn.Embedding(num_embeddings=SEQ_LEN, embedding_dim=emb_dim)
-        self.pos_indices = torch.Tensor(list(range(SEQ_LEN))).type(torch.long).to(DEVICE)
-        self.dropout = nn.Dropout(0.2 * DROPOUT)
+        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)        
+        self.pos_encoding = PositionalEncoding(seq_len, emb_dim=emb_dim)
+
+        self.dropout = nn.Dropout(0.2) if dropout else nn.Identity()        
         
-        self.encoders = [
+        self.encoders = nn.ModuleList([
             EncoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
             for _ in range(n_layers)
-            ]
+            ])
 
-    def forward(self, x):
-        seq_len = x.shape[1]
-
+    def forward(self, x, src_mask):
         # Embeddings and positional encoding
-        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:seq_len])
+        x = self.dropout(self.embedding(x))
+        x = self.pos_encoding(x)       
 
         # Encoder
         for encoder in self.encoders:
-            x = encoder(x)
+            x = encoder(x, src_mask)
 
         return x
     
 class Decoder(nn.Module):
-    def __init__(self, n_tokens, emb_dim, intermediate_dim, n_layers=6, n_heads=8):
+    def __init__(self, seq_len, n_tokens, emb_dim, intermediate_dim, n_layers=6, n_heads=8, dropout=True):
         super().__init__()
 
+        self.seq_len = seq_len
         self.emb_dim = emb_dim
+
         self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=emb_dim)
-        self.pos_encoding = nn.Embedding(num_embeddings=SEQ_LEN, embedding_dim=emb_dim)
-        self.pos_indices = torch.Tensor(list(range(SEQ_LEN))).type(torch.long).to(DEVICE)
-        self.dropout = nn.Dropout(0.2 * DROPOUT)
+        self.pos_encoding = PositionalEncoding(self.seq_len, emb_dim=emb_dim)
+
+        self.dropout = nn.Dropout(0.2) if dropout else nn.Identity()
         
-        self.decoders = [
+        self.decoders = nn.ModuleList([
             DecoderLayer(emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_heads=n_heads) 
             for _ in range(n_layers)
-            ]
+            ])
 
     def forward(self, x, encoded):
         seq_len = x.shape[1]
         mask = 1.0 - torch.triu(torch.ones((seq_len, seq_len))).to(DEVICE)
 
         # Embeddings and positional encoding
-        x = self.dropout(self.embedding(x)) + self.pos_encoding(self.pos_indices[:seq_len])
+        x = self.dropout(self.embedding(x))
+        x = self.pos_encoding(x)
 
         # Encoder
         for decoder in self.decoders:
@@ -152,154 +207,54 @@ class Decoder(nn.Module):
         return x    
 
 class Transformer(nn.Module):
-    def __init__(self, n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8):
+    def __init__(self, seq_len, n_tokens, pad_token, emb_dim=256, intermediate_dim=1024, n_layers=6, n_heads=8, dropout=True):
         super().__init__()
 
-        self.encoder = Encoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
-        self.decoder = Decoder(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
+        self.seq_len = seq_len
+        self.pad_token = pad_token
+
+        self.encoder = Encoder(seq_len=seq_len, n_tokens=n_tokens, emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_layers=n_layers, n_heads=n_heads, dropout=dropout)
+        self.decoder = Decoder(seq_len=seq_len, n_tokens=n_tokens, emb_dim=emb_dim, intermediate_dim=intermediate_dim, n_layers=n_layers, n_heads=n_heads, dropout=dropout)
+        self.mlp = nn.Sequential(
+            nn.Linear(emb_dim, intermediate_dim),
+            nn.GELU(),
+            nn.Linear(intermediate_dim, n_tokens)
+            )
 
     def forward(self, source_sequence, target_sequence):
-        encoded = self.encoder(source_sequence)
-        return self.decoder(target_sequence, encoded)
+        encoded = self.encode(source_sequence)
+        return self.decode(target_sequence, encoded)
 
-class Net(nn.Module):
-    def __init__(self):
-        super().__init__()
+    def decode(self, target_sequence, encoded):
+        decoded = self.decoder(target_sequence, encoded)
 
-        self.transformer = Transformer(n_tokens=N_TOKENS, emb_dim=EMB_DIM, intermediate_dim=EMB_DIM*4, n_layers=6, n_heads=8)
-        self.relu = nn.ReLU()
-        self.fc = nn.Linear(EMB_DIM, 2)
-
-    def forward(self, inp, tgt):
-        x = self.transformer(inp, tgt)[:,0,:]
-        return self.fc(x)
+        return self.mlp(decoded[:,0,:])
     
-class SymmetricSequences(torch.utils.data.Dataset):
-    def __init__(self, seq_len):
-        self.seq_len = seq_len
-        pass
-    
-    def __len__(self):
-        return BATCH_SIZE
-    
-    def __getitem__(self, idx):        
-        # if random.uniform(0, 1) < .5:
-        #     seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-        #     seq2 = torch.flip(seq1, dims=[0])
-        #     return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
-        # else:
-        #     seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-        #     seq2 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-        #     return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
+    def encode(self, source_sequence):
+        BS = source_sequence.shape[0]
+        src_mask = torch.empty(BS, self.seq_len, self.seq_len).to(DEVICE)
+        mask = 1.0 - 1.0 * (source_sequence == self.pad_token)
+        for idx in range(source_sequence.shape[0]):
+            src_mask[idx,:,:] = torch.outer(mask[idx], mask[idx])
 
-        if random.uniform(0, 1) < .5:
-            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            
-            seq2 = torch.empty_like(seq1[:self.seq_len//2])
-            for i in range(self.seq_len//2):
-                seq2[i] = (seq1[2*i] + seq1[2*i+1]) % N_TOKENS
-            #seq2 = (torch.flip(seq2, dims=[0]) + N_TOKENS // 2) % N_TOKENS
-
-            #print(seq1)
-            #print(seq2)
-            #exit()
-            
-            return seq1, seq2, torch.Tensor([1]).type(torch.long).to(DEVICE)
-        else:
-            seq1 = torch.trunc(torch.rand(self.seq_len) * N_TOKENS).type(torch.long).to(DEVICE)
-            seq2 = torch.trunc(torch.rand(self.seq_len//2) * N_TOKENS).type(torch.long).to(DEVICE)
-            return seq1, seq2, torch.Tensor([0]).type(torch.long).to(DEVICE)
+        return self.encoder(source_sequence, src_mask)
         
-
-class Warmup():
-    def __init__(self, optim, target_lr = 0.01, min_lr = 0.0001, warmup_steps = 200, cooldown_steps = 5000):
-        self.optim = optim
-        self.target_lr = target_lr
-        self.min_lr = min_lr
-        self.warmup_steps = warmup_steps
-        self.cooldown_steps = cooldown_steps
-        self.steps = 0
-
-    def state_dict(self):
-        return { "steps": self.steps }
     
-    def load_state_dict(self, dct):
-        self.steps = dct["steps"]
+    def seq2seq(self, source_sequence, sos_token, eos_token):
+        target_sequence = torch.ones(self.seq_len).to(source_sequence.device).to(torch.long).view(1,-1) * self.pad_token
+        target_sequence[0] = sos_token
 
-    def step(self):
-        self.steps += 1
-        if self.steps < self.warmup_steps:
-          ratio = self.steps / self.warmup_steps
-          lr = self.target_lr * ratio
-        elif self.steps < self.cooldown_steps:
-          ratio = 1.0 - (self.steps - self.warmup_steps) / (self.cooldown_steps - self.warmup_steps)
-          lr = self.min_lr + ratio * self.target_lr
-        else:
-          lr = self.min_lr
+        encoded = self.encode(source_sequence.view(1,-1))
+        idx = 1
+        while idx < self.seq_len:
+          res = torch.argmax(self.decode(target_sequence, encoded))
+          target_sequence[0,idx] = res
+          idx += 1
+          if res == eos_token:
+              break
 
-        for param_group in self.optim.param_groups:
-            param_group['lr'] = lr
+        return target_sequence[0]
+
 
         
-
-net = Net().to(DEVICE)
-
-optim = torch.optim.Adam(net.parameters(), lr=0.001)
-criterion = torch.nn.CrossEntropyLoss()
-dataset = SymmetricSequences(SEQ_LEN)
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
-warmup = Warmup(optim=optim, target_lr=0.01, warmup_steps=6000, min_lr=0.0001, cooldown_steps=36000)
-
-try:
-    chkpt = torch.load("model.pt")
-    net.load_state_dict(chkpt["model"])
-    optim.load_state_dict(chkpt["optim"])
-    warmup.load_state_dict(chkpt["scheduler"])
-except:
-    print("Could not load model, starting from scratch!")
-
-bar = tqdm(range(1000000))
-total_loss = 0
-cnt = 0
-acc = 0
-for iter in bar:  
-  inp, tgt, labels = dataloader.__iter__().__next__()
-  labels = labels.view(-1)
-
-  optim.zero_grad()
-  x = net(inp, tgt)
-  loss = criterion(x, labels)
-
-  loss.backward()
-  acc += torch.sum(torch.argmax(x, dim=1) == labels)
-  total_loss += loss.item()
-  cnt += tgt.shape[0]
-  optim.step()
-  warmup.step()
-
-  if iter % 50 == 0:
-    bar.set_description(f"loss={total_loss / cnt * 1000.0:.3f}, acc={acc / cnt * 100:.3f}%")
-    total_loss = 0
-    cnt = 0
-    acc = 0
-
-  if iter % 500 == 0:
-    try:
-      chkpt = torch.save({
-        "model": net.state_dict(),
-        "optim": optim.state_dict(),
-        "scheduler": warmup.state_dict()
-      }, "model.pt")
-    except:
-      print("Could not save model!")
-
-
-
-
-exit()
-        
-
-input = torch.zeros(size=(BATCH_SIZE, SEQ_LEN), dtype=torch.long).to(DEVICE)
-output = net(input)
-print(output.shape)
 
