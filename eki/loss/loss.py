@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 # Sei dazu X ein numpy.array mit den Datenpunkten. Wenden Sie das (ebenfalls übergebene)
 # Model auf die Daten an und geben Sie die jeweilige Prädiktion zurück
 def predict(model, x):
-    return model[0] *x + model[1]
+    return np.zeros_like(x) # Geben Sie hier die Modellprädiktion zurück
 
 # Aufgabe 2
 # Implementieren Sie die "evaluate"-Methode der unteren Klasse "MSELoss", wo sie den 
@@ -23,16 +23,13 @@ class MSELoss:
 
     def evaluate(self, model, x, y):
         # Hinweis: Berechnen Sie zunächst das Residuum
-        residuum = predict(model, x) - y
+        #residuum = 
 
         # Berechnen Sie dann den (summarischen, also skalaren) Fehlerterm
-        error = np.sum(residuum**2)
+        error = 0
 
         # Und dann den Gradienten
-        grad = np.array([
-            np.sum(residuum * x),
-            np.sum(residuum * 1)
-        ])
+        grad = np.array([0, 0])
 
         # Geben Sie sowohl den (skalaren) Fehler als den (vektoriellen) Gradienten zurück
         return error, grad
@@ -47,32 +44,14 @@ class MAELoss:
         pass
 
     def evaluate(self, model, x, y):
-        residuum = predict(model, x) - y
-
-        error = np.sum(np.abs(residuum))
-
-        grad = np.array([
-            np.sum(np.sign(residuum) * x),
-            np.sum(np.sign(residuum) * 1)
-        ])
-
-        return error, grad    
+        pass    
 
 class LogCoshLoss:
     def __init__(self):
         pass
 
     def evaluate(self, model, x, y):
-        residuum = predict(model, x) - y
-
-        error = np.sum(np.log(np.cosh(residuum)))
-
-        grad = np.array([
-            np.sum(np.tanh(residuum) * x),
-            np.sum(np.tanh(residuum) * 1)
-        ])
-
-        return error, grad     
+        pass   
 
 # Bei der folgenden Funktion erhalten Sie als Parameter ein Axis-Object von MatPlotLib sowie einer ihrer
 # obigen Loss-Klassen, die unabhänigen Daten (x) und die abhänige Variable (y). 
