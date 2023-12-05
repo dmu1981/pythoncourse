@@ -1,7 +1,7 @@
 import torch
 
-A = torch.rand(2,2).to("cuda")
-B = torch.rand(2,2).to("cuda")
+A = torch.rand(2,2)#.to("cuda")
+B = torch.rand(2,2)#.to("cuda")
 C = torch.rand(2,2)
 
 print(A+B)
