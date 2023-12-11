@@ -1,2 +1,3 @@
 cifar10
 fashionMNIST
+*.pt

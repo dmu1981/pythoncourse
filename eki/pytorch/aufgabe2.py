@@ -32,8 +32,7 @@ plt.show()
 class ConvNet(nn.Module):
     def __init__(self):
         super().__init__()
-
-        
+                
         # TODO: 
         # Erzeugen Sie geeignete Layer um das Eingangsbild (3x32x32) auf
         # die geeignete Tensorgröße herunterzubrechen.

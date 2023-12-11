@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print(DEVICE)
 
 dataset = torchvision.datasets.FashionMNIST("fashionMNIST", 
                                             download=True,
