@@ -46,9 +46,7 @@ class FullNet(nn.Module):
         # Nach dem flatten entspricht dies 28*28 = 784 Eingabedimensionen
         # Verwenden Sie noch 392 Neuronen in der ersten und 128 Neuronen in der zweiten
         # Schicht. Auf der letzten Schicht brauchen Sie exakt 10 Neuronen (für jede Klasse 1)
-        self.linear1 = nn.Linear(28*28, 392)
-        self.linear2 = nn.Linear(392, 128)
-        self.linear3 = nn.Linear(128, 10)
+        
 
     def forward(self, x):
         # TODO: 
@@ -56,10 +54,7 @@ class FullNet(nn.Module):
         # indem Sie die Daten zunächst flatten und dann suksezive 
         # durch die linearen Schichten und den Sigmoid geben. 
         # ACHTUNG: Auf der letzten Schicht brauchen Sie keine Nicht-Linearität
-        x = self.flatten(x)
-        x = self.sigmoid(self.linear1(x))
-        x = self.sigmoid(self.linear2(x))
-        x = self.linear3(x)
+        
 
         return x
 
@@ -80,26 +75,22 @@ class ConvNet(nn.Module):
         # geeigente Layer. Sie benötigen 2 Faltungen mit je einer kernel_size von (5,5)
         # Verwenden Sie padding="same". Da sie nach jeder Faltung eine MaxPooling anwenden
         # werden vergrößern Sie gleichzeitig die Anzahl Kanäle (also z.B. 8, dann 16)
-        self.pool = nn.MaxPool2d(kernel_size=(2,2), stride=(2,2)) 
-        self.c1 = nn.Conv2d( 1,  8, kernel_size=(5,5), padding="same")    
-        self.c2 = nn.Conv2d( 8, 16, kernel_size=(5,5), padding="same")
+        
 
         # TODO:
         # Überlegen Sie wieviele "Neuronen" ihr Netzwerk nach den drei Faltungslayern
         # noch hat (bei 16 Kanälen) und erzeugen Sie ein entsprechend großes Fully-Connected
         # Layer mit nn.Linear (wie oben))
-        self.linear = nn.Linear(784, 10)
+        
         
     def forward(self, x):
         # TODO:
         # Implementieren Sie den Forward-Pass ihres Faltungsnetzwerkes
         # indem Sie immer abwechseln zwischen Faltung und Pooling + ReLU. 
-        x = self.relu(self.pool(self.c1(x)))
-        x = self.relu(self.pool(self.c2(x)))
+        
 
         # Flatten Sie nun das Ergebniss und wenden Sie den letzten Fully-Connected Teil
         # an um ihr Ergebniss zu erzeugen
-        x = self.linear(self.flatten(x))
         
         return x
 

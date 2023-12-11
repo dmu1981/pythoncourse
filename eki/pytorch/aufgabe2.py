@@ -32,27 +32,16 @@ plt.show()
 class ConvNet(nn.Module):
     def __init__(self):
         super().__init__()
-                
+
         # TODO: 
         # Erzeugen Sie geeignete Layer um das Eingangsbild (3x32x32) auf
         # die geeignete Tensorgröße herunterzubrechen.
         # HINWEIS: CIFAR10 hat 10 Klassen, sie brauchen demnach 10 Neuronen am Ende.
-        self.relu = nn.ReLU()
-        self.flatten = nn.Flatten()
-        self.pool = nn.MaxPool2d(kernel_size=(2,2), stride=(2,2)) 
-        self.c1 = nn.Conv2d( 3,  8, kernel_size=(5,5), padding="same")    
-        self.c2 = nn.Conv2d( 8, 16, kernel_size=(5,5), padding="same")
-        self.c3 = nn.Conv2d(16, 32, kernel_size=(5,5), padding="same")
-        self.linear = nn.Linear(512, 10)
         
     def forward(self, x):
         # TODO:
         # Implementieren Sie den Forward-Pass ihres Faltungsnetzwerkes
         # ähnlich zu Aufgabe 1
-        x = self.relu(self.pool(self.c1(x)))
-        x = self.relu(self.pool(self.c2(x)))
-        x = self.relu(self.pool(self.c3(x)))
-        x = self.linear(self.flatten(x))
         return x
     
 

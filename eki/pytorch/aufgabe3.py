@@ -48,18 +48,10 @@ class DownConv(nn.Module):
         # TODO:
         # Als Bonus können Sie vor jeder ReLU ein BatchNorm2d Layer einfügen
         #   https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html
-        self.relu = nn.ReLU()
-        self.pool = nn.MaxPool2d(kernel_size=(2,2),stride=(2,2))
-        self.conv1 = nn.Conv2d(input_channels, intermediate_channels, kernel_size=kernel_size, padding="same")
-        self.conv2 = nn.Conv2d(intermediate_channels, output_channels, kernel_size=kernel_size, padding="same")
-        self.bn1 = nn.BatchNorm2d(intermediate_channels)
-        self.bn2 = nn.BatchNorm2d(output_channels)
-
+        
     def forward(self, x):
         # TODO:
         # Führen Sie die Mehrfach-Faltung wie oben beschrieben aus und geben Sie das Ergebniss zurück
-        x = self.relu(self.bn1(self.conv1(x)))
-        x = self.relu(self.bn2(self.pool(self.conv2(x))))
         return x
 
 # Aufgabe 2
@@ -71,20 +63,11 @@ class ConvNet(nn.Module):
                 
         # TODO: 
         # Erzeugen Sie geeignete Layer 
-        self.down1 = DownConv( 3,  8,  8)
-        self.down2 = DownConv( 8, 16, 16)
-        self.down3 = DownConv(16, 32, 32)
-        self.flatten = nn.Flatten()
-        self.linear = nn.Linear(512, 10)
         
     def forward(self, x):
         # TODO:
         # Implementieren Sie den Forward-Pass ihres Faltungsnetzwerkes
         # indem Sie ihre oben erzeugen DownConv Module aufrufen
-        x = self.down1(x)
-        x = self.down2(x)
-        x = self.down3(x)
-        x = self.linear(self.flatten(x))
         return x
 
 # Aufgabe 3:    
@@ -101,9 +84,7 @@ def load_checkpoint(net, optim):
         #
         #   https://pytorch.org/docs/stable/generated/torch.load.html
         #
-        chkpt = torch.load("model.pt")
-        net.load_state_dict(chkpt["model"])
-        optim.load_state_dict(chkpt["optim"])
+        pass
     except:
         print("Could not load checkpoint, starting from scratch")
 
@@ -113,10 +94,7 @@ def save_checkpoint(net, optim):
     #
     #   https://pytorch.org/docs/stable/generated/torch.save.html#torch.save
     #
-    torch.save({
-        "model": net.state_dict(),
-        "optim": optim.state_dict()
-    }, "model.pt")
+    pass
 
 ### AB HIER BRAUCHEN SIE NICHTS ZU TUN AUSSER ZU VERSTEHEN WAS PASSIERT
 net = ConvNet()
