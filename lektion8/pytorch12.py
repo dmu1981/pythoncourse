@@ -4,22 +4,17 @@ from torch import nn
 eta = 0.01
 
 sig = nn.Sigmoid()
-fc1 = nn.Linear(2, 2)
-fc2 = nn.Linear(2, 2)
-fc3 = nn.Linear(2, 2)
+fc1 = nn.Linear(2, 4)
+fc2 = nn.Linear(4, 4)
+fc3 = nn.Linear(4, 1)
 
 loss = nn.MSELoss()
 
 
 X = torch.tensor([0.4, 0.5])
-Y = torch.tensor([0.4, 1.0])
+Y = torch.tensor([0.4])
 
 for epoch in range(10000):
-  if fc1.weight.grad is not None:
-    fc1.weight.grad.zero_()
-    fc2.weight.grad.zero_()
-    fc3.weight.grad.zero_()
-
   x = X
   x = sig(fc1(x))
   x = sig(fc2(x))

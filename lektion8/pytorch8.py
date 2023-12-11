@@ -14,14 +14,12 @@ X = torch.tensor([
     [8.0, 5.0, 1.0, 4.0],
     ])
 
-Y = torch.tensor([0.0, 1.0, 0.0, 1.0])
+Y = torch.tensor([-1.0, 1.0, -1.0, 1.0])
 
 # Das Skalarprodukt (Die Präditkion)
 for epoch in range(1000):
-    if W.grad is not None:
-        W.grad.zero_()
 
-    prediction = X @ W
+    prediction = torch.functional.F.tanh(X @ W)
     #print(prediction)
 
     # Der Vorhersagefehler

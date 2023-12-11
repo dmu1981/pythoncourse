@@ -36,4 +36,6 @@ print("O3: ", O3)
 E = torch.mean((O3 - Y)**2)
 print(f"{E:.3f}")
 
+E.backward()
+print(W1.grad)
     

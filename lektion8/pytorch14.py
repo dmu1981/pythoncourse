@@ -15,9 +15,8 @@ class Net(nn.Module):
 
 net = Net()  
 loss = nn.MSELoss()
-optim = torch.optim.SGD(net.parameters(), lr=0.001)
+optim = torch.optim.SGD(net.parameters(), lr=0.01)
 
-optim.zero_grad()
 
 X = torch.tensor([[0.0, 0.0], 
                   [1.0, 0.0], 
@@ -27,6 +26,8 @@ X = torch.tensor([[0.0, 0.0],
 Y = torch.tensor([[0.0, 1.0, 1.0, 0.0]]).T
 
 for epoch in range(10000):
+  optim.zero_grad()
+
   out = net(X)
   e = loss(out, Y)
   e.backward()

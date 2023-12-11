@@ -19,12 +19,14 @@ net = Net()
 loss = nn.MSELoss()
 optim = torch.optim.SGD(net.parameters(), lr=0.01)
 
-optim.zero_grad()
+
 
 X = torch.tensor([0.4, 0.5])
 Y = torch.tensor([0.4, 1.0])
 
 for epoch in range(1000):
+  optim.zero_grad()
+  
   out = net(X)
   e = loss(out, Y)
   e.backward()
