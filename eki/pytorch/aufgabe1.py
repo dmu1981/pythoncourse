@@ -5,9 +5,6 @@ from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-print(DEVICE)
-
 dataset = torchvision.datasets.FashionMNIST("fashionMNIST", 
                                             download=True,
                                             train=True,
@@ -20,7 +17,7 @@ dataset_test = torchvision.datasets.FashionMNIST("fashionMNIST",
                                             train=False,
                                             transform=torchvision.transforms.ToTensor())
 
-loader_test = DataLoader(dataset, batch_size=16, shuffle=True)
+loader_test = DataLoader(dataset_test, batch_size=16, shuffle=True)
 
 
 batch, labels = loader.__iter__().__next__()
@@ -54,7 +51,6 @@ class FullNet(nn.Module):
         # indem Sie die Daten zunächst flatten und dann suksezive 
         # durch die linearen Schichten und den Sigmoid geben. 
         # ACHTUNG: Auf der letzten Schicht brauchen Sie keine Nicht-Linearität
-        
 
         return x
 

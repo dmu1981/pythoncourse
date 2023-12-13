@@ -5,8 +5,6 @@ from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
 dataset = torchvision.datasets.CIFAR10("cifar10", 
                                        download=True,
                                        train=True,
@@ -19,7 +17,7 @@ dataset_test = torchvision.datasets.CIFAR10("cifar10",
                                        train=False,
                                        transform=torchvision.transforms.ToTensor())
 
-loader_test = DataLoader(dataset, batch_size=16, shuffle=True)
+loader_test = DataLoader(dataset_test, batch_size=16, shuffle=True)
 
 batch, labels = loader.__iter__().__next__()
 grid = torchvision.utils.make_grid(batch, 4).permute(1,2,0)
