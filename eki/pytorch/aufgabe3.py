@@ -20,7 +20,7 @@ dataset_test = torchvision.datasets.CIFAR10("cifar10",
 loader_test = DataLoader(dataset_test, batch_size=256, shuffle=True)
 
 batch, labels = loader.__iter__().__next__()
-grid = torchvision.utils.make_grid(batch, 4).permute(1,2,0)
+grid = torchvision.utils.make_grid(batch, 16).permute(1,2,0)
 plt.imshow(grid)
 plt.show()
 
@@ -46,7 +46,7 @@ class DownConv(nn.Module):
         # TODO:
         # Als Bonus können Sie vor jeder ReLU ein BatchNorm2d Layer einfügen
         #   https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html
-        
+
     def forward(self, x):
         # TODO:
         # Führen Sie die Mehrfach-Faltung wie oben beschrieben aus und geben Sie das Ergebniss zurück

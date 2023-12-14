@@ -4,25 +4,26 @@ import torchvision
 from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
 from tqdm import tqdm
- os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 dataset = torchvision.datasets.FashionMNIST("fashionMNIST", 
                                             download=True,
                                             train=True,
                                             transform=torchvision.transforms.ToTensor())
 
-loader = DataLoader(dataset, batch_size=16, shuffle=True)
+loader = DataLoader(dataset, batch_size=64, shuffle=True)
 
 dataset_test = torchvision.datasets.FashionMNIST("fashionMNIST", 
                                             download=True,
                                             train=False,
                                             transform=torchvision.transforms.ToTensor())
 
-loader_test = DataLoader(dataset_test, batch_size=16, shuffle=True)
+loader_test = DataLoader(dataset_test, batch_size=64, shuffle=True)
 
 
 batch, labels = loader.__iter__().__next__()
-grid = torchvision.utils.make_grid(batch, 4).permute(1,2,0)
+grid = torchvision.utils.make_grid(batch, 16).permute(1,2,0)
 plt.imshow(grid)
 plt.show()
 
@@ -72,7 +73,7 @@ class ConvNet(nn.Module):
 
         self.relu = nn.ReLU()
         self.flatten = nn.Flatten()
-        
+
         # TODO: 
         # Erzeugen Sie mittels nn.MaxPool2D und nn.Conv2d 
         # geeigente Layer. Sie benötigen 2 Faltungen mit je einer kernel_size von (5,5)
@@ -87,19 +88,19 @@ class ConvNet(nn.Module):
         # noch hat (bei 16 Kanälen) und erzeugen Sie ein entsprechend großes Fully-Connected
         # Layer mit nn.Linear (wie oben))
         self.linear = nn.Linear(784, 10)
-        
+
     def forward(self, x):
         # TODO:
         # Implementieren Sie den Forward-Pass ihres Faltungsnetzwerkes
         # indem Sie immer abwechseln zwischen Faltung und Pooling + ReLU. 
-        x = self.relu(self.pool(self.c1(x)))
-        x = self.relu(self.pool(self.c2(x)))
+        x1 = self.relu(self.pool(self.c1(x)))
+        x2 = self.relu(self.pool(self.c2(x1)))
 
         # Flatten Sie nun das Ergebniss und wenden Sie den letzten Fully-Connected Teil
         # an um ihr Ergebniss zu erzeugen
-        x = self.linear(self.flatten(x))
+        x3 = self.linear(self.flatten(x2))
 
-        return x
+        return x3, x1, x2
 
 net = ConvNet()
 optim = torch.optim.Adam(net.parameters(), lr=0.001)
@@ -117,10 +118,12 @@ for epoch in range(10):
     for batch, labels in bar:
         optim.zero_grad()
 
-        out = net(batch)
+        out, _, _ = net(batch)
         loss = criterion(out, labels)
         loss.backward()
+
         
+
         total_correct += torch.sum(torch.argmax(out, dim=1) == labels)
         total_loss += loss.item()
         total_cnt += batch.shape[0]
@@ -129,6 +132,18 @@ for epoch in range(10):
 
         optim.step()
 
+    batch, _ = loader.__iter__().__next__()
+    out, c1, c2 = net(batch)
+    fix, axs = plt.subplots(1,3)
+    c1 = c1[0].view( 8,1,14,14).repeat([1,3,1,1])
+    c2 = c2[0].view(16,1, 7, 7).repeat([1,3,1,1])
+    grid1 = torchvision.utils.make_grid(c1.detach().cpu(), 1).permute(1,2,0)
+    grid2 = torchvision.utils.make_grid(c2.detach().cpu(), 2).permute(1,2,0)
+    axs[0].imshow(batch[0].permute(1,2,0), cmap="gray")
+    axs[1].imshow(grid1[:,:,0], cmap="jet")
+    axs[2].imshow(grid2[:,:,0], cmap="jet")
+    plt.show()
+
     total_loss = 0
     total_cnt = 0
     total_correct = 0
@@ -136,17 +151,11 @@ for epoch in range(10):
     bar = tqdm(loader_test)
     for batch, labels in bar:
         with torch.no_grad():
-            out = net(batch)
+            out, _, _ = net(batch)
             loss = criterion(out, labels)
-        
+
         total_correct += torch.sum(torch.argmax(out, dim=1) == labels)
         total_loss += loss.item()
         total_cnt += batch.shape[0]
 
         bar.set_description(f"test: epoch={epoch}, loss={1000.0*total_loss / total_cnt:.3f}, acc={total_correct / total_cnt * 100:.2f}%")
-
-
-
-
-
-
