@@ -10,40 +10,21 @@ import seaborn as sns
 import pandas as pd
 
 # Aufgabe 1:
-# Erzeugen Sie wie in der Vorlesung gezeigt einen SummaryWriter 
+# Erzeugen Sie wie in der Vorlesung gezeigt einen (globalen!) SummaryWriter 
 # und implementieren Sie die "writeBatchSummary"-Methode um zu jedem Batch 
 # den erreichten Loss und die Erreichte Genauigkeit ins TensorBoard zu schreiben
-writer = SummaryWriter()
-
 def writeBatchSummary(predictions, labels, criterion, step):
-    loss = criterion(predictions, labels) 
-    writer.add_scalar("loss", loss.item(), step)
-    
-    accuracy = torch.mean(torch.argmax(predictions, dim=1) == labels, dtype=torch.float32)
-    writer.add_scalar("accuracy", accuracy, step)
+    pass
+
+
 
 # Aufgabe 2:
 # Erweitern Sie die "writeBatchSummary"-Methode derart, dass Sie über 25000 Samples eine Statistik sammeln
 # bevor Sie Daten ans TensorBoard schicken. 
-total_loss = 0
-total_correct = 0
-total_cnt = 0
-def writeBatchSummary2(predictions, labels, criterion, step):
-    global total_loss, total_correct, total_cnt, confusion
 
-    predicted_classes = torch.argmax(predictions, dim=1)
 
-    total_loss      += criterion(predictions, labels).item()
-    total_correct   += torch.sum(predicted_classes == labels)
-    total_cnt       += labels.shape[0]
 
-    if total_cnt >= 25000:
-        writer.add_scalar("loss", total_loss / total_cnt, step)
-        writer.add_scalar("accuracy", total_correct / total_cnt, step)
-        total_loss = 0
-        total_correct = 0
-        total_cnt = 0
-
+# Aufgabe 3:
 # Berechnen Sie zusätzlich zur allgemeinen Accuracy auch die 
 # "Confusion-Matrix", also die Verwechslungen zwischen allen Klassenpaaren. Verwenden Sie die SeaBorn-Library
 # und erzeugen Sie eine s.g. "HeatMap" wo sie die Verwechslungen darstellen
@@ -54,37 +35,11 @@ def writeBatchSummary2(predictions, labels, criterion, step):
 #
 #   https://pytorch.org/docs/stable/tensorboard.html
 #        
-confusion = torch.zeros((10, 10))
-def writeBatchSummary3(predictions, labels, criterion, step):
-    global total_loss, total_correct, total_cnt, confusion
 
-    predicted_classes = torch.argmax(predictions, dim=1)
 
-    total_loss      += criterion(predictions, labels).item()
-    total_correct   += torch.sum(predicted_classes == labels)
-    total_cnt       += labels.shape[0]
 
-    for idx, label in enumerate(labels):
-        confusion[label][predicted_classes[idx]] += 1
 
-    if total_cnt > 25000:
-        writer.add_scalar("loss", total_loss / total_cnt, step)
-        writer.add_scalar("accuracy", total_correct / total_cnt, step)
-        total_loss = 0
-        total_correct = 0
-        total_cnt = 0
 
-        f, ax = plt.subplots(figsize=(9,6))
-        classes = ["Airplane","Automobile","Bird","Cat","Deer","Dog","Frog","Horse","Ship","Truck"]
-        df = pd.DataFrame(
-            confusion.long(), 
-            classes, classes
-            )
-        s = sns.heatmap(df, ax=ax, annot=True, fmt="d", linewidths=.5, cmap=sns.cubehelix_palette(as_cmap=True))
-        s.set(xlabel="Prediction", ylabel="Ground Truth")
-        writer.add_figure("confusion", f, step)
-
-        confusion = torch.zeros((10, 10))
 
 
 
@@ -173,7 +128,7 @@ for epoch in range(10):
         loss = criterion(out, labels)
         loss.backward()
 
-        writeBatchSummary3(out, labels, criterion, global_step)
+        writeBatchSummary(out, labels, criterion, global_step)
     
         optim.step()
 
