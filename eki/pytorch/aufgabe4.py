@@ -9,22 +9,34 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(device)
+
 # Aufgabe 1:
-# Erzeugen Sie wie in der Vorlesung gezeigt einen (globalen!) SummaryWriter 
+# Erzeugen Sie wie in der Vorlesung gezeigt einen SummaryWriter 
 # und implementieren Sie die "writeBatchSummary"-Methode um zu jedem Batch 
 # den erreichten Loss und die Erreichte Genauigkeit ins TensorBoard zu schreiben
+writer = SummaryWriter()
+
+cnt = 0
+total_loss = 0
+total_correct = 0
 def writeBatchSummary(predictions, labels, criterion, step):
-    pass
+    global cnt, total_loss, total_correct, total_batches
+    cnt = cnt + predictions.shape[0]
+    total_loss += criterion(predictions, labels)
+    total_correct += torch.sum(torch.argmax(predictions, dim=1) == labels)
+
+    if cnt > 25000:
+        writer.add_scalar("loss", total_loss / total_batches, step)
+        writer.add_scalar("accuracy", total_correct / cnt, step)
+        cnt = 0
+        total_loss = 0
+        total_correct = 0
 
 
 
-# Aufgabe 2:
-# Erweitern Sie die "writeBatchSummary"-Methode derart, dass Sie über 25000 Samples eine Statistik sammeln
-# bevor Sie Daten ans TensorBoard schicken. 
 
-
-
-# Aufgabe 3:
 # Berechnen Sie zusätzlich zur allgemeinen Accuracy auch die 
 # "Confusion-Matrix", also die Verwechslungen zwischen allen Klassenpaaren. Verwenden Sie die SeaBorn-Library
 # und erzeugen Sie eine s.g. "HeatMap" wo sie die Verwechslungen darstellen
@@ -35,12 +47,8 @@ def writeBatchSummary(predictions, labels, criterion, step):
 #
 #   https://pytorch.org/docs/stable/tensorboard.html
 #        
-
-
-
-
-
-
+def writeBatchSummary3(predictions, labels, criterion, step):
+    pass
 
 
 
@@ -80,7 +88,7 @@ class DownConv(nn.Module):
 class ConvNet(nn.Module):
     def __init__(self):
         super().__init__()
-                
+
         self.down1 = DownConv( 3, 16, 16)
         self.down2 = DownConv(16, 32, 32)
         self.down3 = DownConv(32, 64, 64)
@@ -112,7 +120,7 @@ def save_checkpoint(net, optim, global_step):
     }, "model.pt")
     pass
 
-net = ConvNet()
+net = ConvNet().to(device)
 optim = torch.optim.Adam(net.parameters(), lr=0.001)
 criterion = torch.nn.CrossEntropyLoss()
 
@@ -120,8 +128,11 @@ global_step = load_checkpoint(net, optim)
 
 for epoch in range(10):
     bar = tqdm(loader)
-    
+
     for batch, labels in bar:
+        batch = batch.to(device)
+        labels = labels.to(device)
+
         optim.zero_grad()
 
         out = net(batch)
@@ -129,13 +140,9 @@ for epoch in range(10):
         loss.backward()
 
         writeBatchSummary(out, labels, criterion, global_step)
-    
+
         optim.step()
 
         global_step += 1
-    
+
     save_checkpoint(net, optim, global_step)
-    
-
-
-
